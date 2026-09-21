@@ -31,7 +31,7 @@
 
   <!-- INPUT: add one task at a time -->
   <section class="card no-print" id="inputCard">
-    <h2 class="card-title">Add a Task</h2>
+    <h2 class="card-title" id="inputCardTitle">Add a Task</h2>
     <form id="entryForm">
       <div class="input-row">
 
@@ -66,7 +66,8 @@
 
       <div class="input-form-footer">
         <div id="entryErrors" class="form-errors" role="alert"></div>
-        <button type="submit" class="primary-btn">+ Add to Plan</button>
+        <button type="button" id="cancelEditBtn" class="ghost-btn hidden">Cancel</button>
+        <button type="submit" id="entrySubmitBtn" class="primary-btn">+ Add to Plan</button>
       </div>
     </form>
   </section>

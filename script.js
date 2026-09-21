@@ -21,6 +21,7 @@
   var employers = loadJSON(STORAGE.employers, []);
   var plans = loadJSON(STORAGE.plans, {}); // keyed by week-start ISO date -> { Mon: [entry,...], ... }
   var currentWeekStart = null; // ISO date string (Monday)
+  var editingEntry = null; // { id, dayKey } of the entry currently loaded into the form, or null
 
   migrateOldEmployerField(plans);
   savePlans();
@@ -129,12 +130,16 @@
   var weekStartInput = document.getElementById("weekStart");
   var weekRangeLabel = document.getElementById("weekRangeLabel");
 
+  var inputCard = document.getElementById("inputCard");
+  var inputCardTitle = document.getElementById("inputCardTitle");
   var entryForm = document.getElementById("entryForm");
   var dateSelect = document.getElementById("dateSelect");
   var jobSelect = document.getElementById("jobSelect");
   var employerCheckList = document.getElementById("employerCheckList");
   var taskInput = document.getElementById("taskInput");
   var entryErrors = document.getElementById("entryErrors");
+  var entrySubmitBtn = document.getElementById("entrySubmitBtn");
+  var cancelEditBtn = document.getElementById("cancelEditBtn");
 
   var jobAddBtn = document.getElementById("jobAddBtn");
   var jobDelBtn = document.getElementById("jobDelBtn");
@@ -179,6 +184,7 @@
     currentWeekStart = iso;
     updateWeekRangeLabel();
     populateDateSelect();
+    exitEditMode();
     renderResults();
   });
 
@@ -319,7 +325,44 @@
     });
   });
 
-  // ---------- Add entry ----------
+  // ---------- Add / Edit entry ----------
+  function enterEditMode(entry, dayKey) {
+    editingEntry = { id: entry.id, dayKey: dayKey };
+    dateSelect.value = dayKey;
+    jobSelect.value = entry.job;
+    var boxes = employerCheckList.querySelectorAll('input[type="checkbox"]');
+    boxes.forEach(function (b) { b.checked = (entry.employers || []).indexOf(b.value) !== -1; });
+    taskInput.value = entry.task;
+    entryErrors.textContent = "";
+
+    inputCardTitle.textContent = "Edit Task";
+    entrySubmitBtn.textContent = "Save Changes";
+    cancelEditBtn.classList.remove("hidden");
+    inputCard.classList.add("editing");
+    inputCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    taskInput.focus();
+  }
+
+  function exitEditMode() {
+    editingEntry = null;
+    inputCardTitle.textContent = "Add a Task";
+    entrySubmitBtn.textContent = "+ Add to Plan";
+    cancelEditBtn.classList.add("hidden");
+    inputCard.classList.remove("editing");
+  }
+
+  function resetEntryFormAfterSave() {
+    taskInput.value = "";
+    var checkedBoxes = employerCheckList.querySelectorAll('input[type="checkbox"]:checked');
+    checkedBoxes.forEach(function (b) { b.checked = false; });
+  }
+
+  cancelEditBtn.addEventListener("click", function () {
+    exitEditMode();
+    resetEntryFormAfterSave();
+    entryErrors.textContent = "";
+  });
+
   entryForm.addEventListener("submit", function (e) {
     e.preventDefault();
     var dayKey = dateSelect.value;
@@ -339,13 +382,23 @@
     entryErrors.textContent = "";
 
     var plan = getCurrentPlan();
-    plan[dayKey].push({ id: makeId(), job: job, employers: selectedEmployers, task: task });
-    savePlans();
 
-    taskInput.value = "";
+    if (editingEntry) {
+      var oldRows = plan[editingEntry.dayKey] || [];
+      var idx = oldRows.findIndex(function (t) { return t.id === editingEntry.id; });
+      var entryObj = idx !== -1 ? oldRows.splice(idx, 1)[0] : { id: editingEntry.id };
+      entryObj.job = job;
+      entryObj.employers = selectedEmployers;
+      entryObj.task = task;
+      plan[dayKey].push(entryObj);
+      exitEditMode();
+    } else {
+      plan[dayKey].push({ id: makeId(), job: job, employers: selectedEmployers, task: task });
+    }
+
+    savePlans();
+    resetEntryFormAfterSave();
     taskInput.focus();
-    var checkedBoxes = employerCheckList.querySelectorAll('input[type="checkbox"]:checked');
-    checkedBoxes.forEach(function (b) { b.checked = false; });
     renderResults();
   });
 
@@ -397,6 +450,18 @@
 
         var actionTd = document.createElement("td");
         actionTd.className = "no-print";
+        var actionsWrap = document.createElement("div");
+        actionsWrap.className = "row-actions";
+
+        var editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "edit-row-btn";
+        editBtn.setAttribute("aria-label", "Edit this task");
+        editBtn.textContent = "✎";
+        editBtn.addEventListener("click", function () {
+          enterEditMode(entry, dayKey);
+        });
+
         var delBtn = document.createElement("button");
         delBtn.type = "button";
         delBtn.className = "remove-row-btn";
@@ -407,10 +472,17 @@
           if (idx !== -1) {
             plan[dayKey].splice(idx, 1);
             savePlans();
+            if (editingEntry && editingEntry.id === entry.id) {
+              exitEditMode();
+              resetEntryFormAfterSave();
+            }
             renderResults();
           }
         });
-        actionTd.appendChild(delBtn);
+
+        actionsWrap.appendChild(editBtn);
+        actionsWrap.appendChild(delBtn);
+        actionTd.appendChild(actionsWrap);
 
         tr.appendChild(jobTd);
         tr.appendChild(descTd);
@@ -486,6 +558,8 @@
       saveEmployers();
       savePlans();
 
+      exitEditMode();
+      resetEntryFormAfterSave();
       renderJobOptions();
       renderEmployerCheckboxes();
       populateDateSelect();
@@ -505,6 +579,8 @@
     }
     plans[currentWeekStart] = emptyPlan();
     savePlans();
+    exitEditMode();
+    resetEntryFormAfterSave();
     renderResults();
     showBackupMsg("This week's report was cleared. Jobs and Team Mates were kept.", true);
   });
