@@ -112,19 +112,17 @@
   var entryForm = document.getElementById("entryForm");
   var dateSelect = document.getElementById("dateSelect");
   var jobSelect = document.getElementById("jobSelect");
-  var employerSelect = document.getElementById("employerSelect");
+  var employerCheckList = document.getElementById("employerCheckList");
   var taskInput = document.getElementById("taskInput");
   var entryErrors = document.getElementById("entryErrors");
 
   var jobAddBtn = document.getElementById("jobAddBtn");
   var jobDelBtn = document.getElementById("jobDelBtn");
   var empAddBtn = document.getElementById("empAddBtn");
-  var empDelBtn = document.getElementById("empDelBtn");
 
   var resultsBody = document.getElementById("resultsBody");
   var resultsWeekRange = document.getElementById("resultsWeekRange");
   var exportBtn = document.getElementById("exportBtn");
-  var exportErrors = document.getElementById("exportErrors");
 
   // ---------- Week selector ----------
   function initWeek() {
@@ -156,7 +154,6 @@
     updateWeekRangeLabel();
     populateDateSelect();
     renderResults();
-    exportErrors.innerHTML = "";
   });
 
   // ---------- Date dropdown (Mon-Fri of the selected week) ----------
@@ -199,8 +196,54 @@
     buildOptions(jobSelect, jobs, jobs.length ? "Select job…" : "No jobs yet — click + Add");
   }
 
-  function renderEmployerOptions() {
-    buildOptions(employerSelect, employers, employers.length ? "Select employer…" : "No employers yet — click + Add");
+  function renderEmployerCheckboxes() {
+    var checkedNames = getCheckedEmployers();
+    employerCheckList.innerHTML = "";
+
+    if (employers.length === 0) {
+      var hint = document.createElement("p");
+      hint.className = "checkbox-list-hint";
+      hint.textContent = "No employers yet — click + Add.";
+      employerCheckList.appendChild(hint);
+      return;
+    }
+
+    employers.forEach(function (name) {
+      var row = document.createElement("div");
+      row.className = "checkbox-item";
+
+      var label = document.createElement("label");
+      var checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = name;
+      checkbox.checked = checkedNames.indexOf(name) !== -1;
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(" " + name));
+
+      var delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "mini-del-btn";
+      delBtn.setAttribute("aria-label", "Delete " + name);
+      delBtn.textContent = "×";
+      delBtn.addEventListener("click", function () {
+        if (!window.confirm('Delete employer "' + name + '" from the list?')) return;
+        var idx = employers.indexOf(name);
+        if (idx !== -1) {
+          employers.splice(idx, 1);
+          saveEmployers();
+          renderEmployerCheckboxes();
+        }
+      });
+
+      row.appendChild(label);
+      row.appendChild(delBtn);
+      employerCheckList.appendChild(row);
+    });
+  }
+
+  function getCheckedEmployers() {
+    var boxes = employerCheckList.querySelectorAll('input[type="checkbox"]:checked');
+    return Array.prototype.map.call(boxes, function (b) { return b.value; });
   }
 
   // ---------- Add / Delete job & employer ----------
@@ -237,27 +280,17 @@
     if (name === null) return;
     name = name.trim();
     if (!name) return;
+    var checkedNames = getCheckedEmployers();
     if (employers.indexOf(name) === -1) {
       employers.push(name);
       saveEmployers();
-      renderEmployerOptions();
     }
-    employerSelect.value = name;
-  });
-
-  empDelBtn.addEventListener("click", function () {
-    var name = employerSelect.value;
-    if (!name) {
-      window.alert("Select an employer first, then click Delete.");
-      return;
-    }
-    if (!window.confirm('Delete employer "' + name + '" from the list?')) return;
-    var idx = employers.indexOf(name);
-    if (idx !== -1) {
-      employers.splice(idx, 1);
-      saveEmployers();
-      renderEmployerOptions();
-    }
+    checkedNames.push(name);
+    renderEmployerCheckboxes();
+    checkedNames.forEach(function (n) {
+      var box = employerCheckList.querySelector('input[value="' + CSS.escape(n) + '"]');
+      if (box) box.checked = true;
+    });
   });
 
   // ---------- Add entry ----------
@@ -265,13 +298,13 @@
     e.preventDefault();
     var dayKey = dateSelect.value;
     var job = jobSelect.value;
-    var employer = employerSelect.value;
+    var selectedEmployers = getCheckedEmployers();
     var task = taskInput.value.trim();
 
     var missing = [];
     if (!job) missing.push("Job");
     if (!task) missing.push("Task");
-    if (!employer) missing.push("Employer");
+    if (selectedEmployers.length === 0) missing.push("Employer");
 
     if (missing.length > 0) {
       entryErrors.textContent = "Please fill in: " + missing.join(", ") + ".";
@@ -280,13 +313,14 @@
     entryErrors.textContent = "";
 
     var plan = getCurrentPlan();
-    plan[dayKey].push({ id: makeId(), job: job, employer: employer, task: task });
+    plan[dayKey].push({ id: makeId(), job: job, employers: selectedEmployers, task: task });
     savePlans();
 
     taskInput.value = "";
     taskInput.focus();
+    var checkedBoxes = employerCheckList.querySelectorAll('input[type="checkbox"]:checked');
+    checkedBoxes.forEach(function (b) { b.checked = false; });
     renderResults();
-    exportErrors.innerHTML = "";
   });
 
   // ---------- Results (live, grouped by day) ----------
@@ -333,7 +367,7 @@
         descTd.textContent = entry.task;
 
         var empTd = document.createElement("td");
-        empTd.textContent = entry.employer;
+        empTd.textContent = entry.employers.join(", ");
 
         var actionTd = document.createElement("td");
         actionTd.className = "no-print";
@@ -368,23 +402,12 @@
 
   // ---------- Export as PDF ----------
   exportBtn.addEventListener("click", function () {
-    var plan = getCurrentPlan();
-    var missingDays = DAY_KEYS.filter(function (k) { return plan[k].length === 0; })
-      .map(function (k) { return DAY_NAMES[k]; });
-
-    if (missingDays.length > 0) {
-      exportErrors.innerHTML = "<strong>Every day (Mon–Fri) needs at least one task before exporting.</strong> Missing: " +
-        missingDays.join(", ") + ".";
-      exportErrors.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-    exportErrors.innerHTML = "";
     window.print();
   });
 
   // ---------- Init ----------
   renderJobOptions();
-  renderEmployerOptions();
+  renderEmployerCheckboxes();
   initWeek();
   populateDateSelect();
   renderResults();

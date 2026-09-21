@@ -45,11 +45,10 @@
         </div>
 
         <div class="field-box">
-          <label for="employerSelect">Employer</label>
-          <select id="employerSelect"></select>
+          <label>Employer(s)</label>
+          <div class="checkbox-list" id="employerCheckList"></div>
           <div class="field-box-actions">
             <button type="button" id="empAddBtn">+ Add</button>
-            <button type="button" id="empDelBtn">&minus; Delete</button>
           </div>
         </div>
 
@@ -73,7 +72,6 @@
       <h2 class="card-title">Weekly Plan</h2>
       <button type="button" id="exportBtn" class="primary-btn">Export as PDF</button>
     </div>
-    <div id="exportErrors" class="form-errors no-print" role="alert"></div>
 
     <div id="printArea" class="print-area">
       <div class="print-header">

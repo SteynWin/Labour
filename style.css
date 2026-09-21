@@ -130,8 +130,60 @@ body {
   color: var(--text);
 }
 .field-box-actions button:hover { background: #f1f5f9; }
-#jobDelBtn, #empDelBtn { color: var(--danger); border-color: #fecaca; }
-#jobDelBtn:hover, #empDelBtn:hover { background: var(--danger-bg); }
+#jobDelBtn { color: var(--danger); border-color: #fecaca; }
+#jobDelBtn:hover { background: var(--danger-bg); }
+
+.checkbox-list {
+  max-height: 130px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  padding: 4px;
+}
+.checkbox-list-hint {
+  margin: 0;
+  padding: 6px 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.checkbox-item:hover { background: #f1f5f9; }
+.checkbox-item label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  margin: 0;
+  cursor: pointer;
+}
+.checkbox-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+.mini-del-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.mini-del-btn:hover { background: var(--danger-bg); color: var(--danger); }
 
 .input-form-footer {
   display: flex;
