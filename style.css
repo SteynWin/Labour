@@ -376,15 +376,26 @@ body {
 }
 
 /* Print styles */
+@page {
+  margin: 12mm 10mm;
+}
 @media print {
-  body { background: #fff; }
+  body { background: #fff; line-height: 1.25; font-size: 0.92rem; }
   .no-print { display: none !important; }
   .container { max-width: 100%; padding: 0; margin: 0; }
   .print-area {
     border: none;
     padding: 0;
   }
-  .results-table th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .results-day { page-break-inside: avoid; }
+  .print-header { margin-bottom: 10px; }
+  .print-logo { height: 32px; margin-bottom: 4px; }
+  .print-header h1 { font-size: 1.2rem; margin: 0 0 2px; }
+  .print-subtitle { font-size: 0.82rem; }
+
+  .results-day { margin-bottom: 10px; page-break-inside: avoid; }
+  .results-day h3 { font-size: 0.92rem; margin: 0 0 4px; padding-bottom: 3px; }
   .results-day-empty { display: none; }
+
+  .results-table th, .results-table td { padding: 4px 7px; font-size: 0.8rem; line-height: 1.25; }
+  .results-table th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
