@@ -85,6 +85,39 @@ body {
   font-size: 0.9rem;
 }
 
+.backup-card { padding: 14px 18px; }
+.backup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.backup-text strong { font-size: 0.92rem; }
+.backup-text p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  max-width: 460px;
+}
+.backup-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.backup-actions button {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--text);
+  white-space: nowrap;
+}
+.backup-actions button:hover { background: #efece6; }
+#backupMsg { margin-top: 8px; }
+
 /* Add-a-task input form */
 .input-row {
   display: grid;
@@ -235,6 +268,7 @@ body {
   flex: 1;
 }
 .form-errors ul { margin: 4px 0 0; padding-left: 18px; }
+.form-errors.form-success { color: var(--success); }
 
 .hidden { display: none !important; }
 

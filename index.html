@@ -29,6 +29,22 @@
     </div>
   </section>
 
+  <!-- BACKUP / RESTORE -->
+  <section class="card no-print backup-card">
+    <div class="backup-row">
+      <div class="backup-text">
+        <strong>Your data</strong>
+        <p>Saved automatically in this browser. Download a backup regularly, or after finishing a week, to keep it safe or move it to another computer.</p>
+      </div>
+      <div class="backup-actions">
+        <button type="button" id="backupDownloadBtn">Download Backup</button>
+        <button type="button" id="backupRestoreBtn">Restore Backup</button>
+        <input type="file" id="backupFileInput" accept="application/json" class="hidden">
+      </div>
+    </div>
+    <div id="backupMsg" class="form-errors" role="status"></div>
+  </section>
+
   <!-- INPUT: add one task at a time -->
   <section class="card no-print" id="inputCard">
     <h2 class="card-title">Add a Task</h2>

@@ -22,21 +22,25 @@
   var plans = loadJSON(STORAGE.plans, {}); // keyed by week-start ISO date -> { Mon: [entry,...], ... }
   var currentWeekStart = null; // ISO date string (Monday)
 
+  migrateOldEmployerField(plans);
+  savePlans();
+
   // Migrate entries saved before employers became multi-select
   // (old shape: entry.employer as a single string)
-  Object.keys(plans).forEach(function (weekKey) {
-    var plan = plans[weekKey];
-    DAY_KEYS.forEach(function (dayKey) {
-      if (!Array.isArray(plan[dayKey])) return;
-      plan[dayKey].forEach(function (entry) {
-        if (!Array.isArray(entry.employers)) {
-          entry.employers = entry.employer ? [entry.employer] : [];
-          delete entry.employer;
-        }
+  function migrateOldEmployerField(plansObj) {
+    Object.keys(plansObj).forEach(function (weekKey) {
+      var plan = plansObj[weekKey];
+      DAY_KEYS.forEach(function (dayKey) {
+        if (!Array.isArray(plan[dayKey])) return;
+        plan[dayKey].forEach(function (entry) {
+          if (!Array.isArray(entry.employers)) {
+            entry.employers = entry.employer ? [entry.employer] : [];
+            delete entry.employer;
+          }
+        });
       });
     });
-  });
-  savePlans();
+  }
 
   // ---------- Storage helpers ----------
   function loadJSON(key, fallback) {
@@ -139,6 +143,11 @@
   var resultsBody = document.getElementById("resultsBody");
   var resultsWeekRange = document.getElementById("resultsWeekRange");
   var exportBtn = document.getElementById("exportBtn");
+
+  var backupDownloadBtn = document.getElementById("backupDownloadBtn");
+  var backupRestoreBtn = document.getElementById("backupRestoreBtn");
+  var backupFileInput = document.getElementById("backupFileInput");
+  var backupMsg = document.getElementById("backupMsg");
 
   // ---------- Week selector ----------
   function initWeek() {
@@ -419,6 +428,73 @@
   // ---------- Export as PDF ----------
   exportBtn.addEventListener("click", function () {
     window.print();
+  });
+
+  // ---------- Backup / Restore ----------
+  function showBackupMsg(text, isSuccess) {
+    backupMsg.textContent = text;
+    backupMsg.classList.toggle("form-success", !!isSuccess);
+  }
+
+  backupDownloadBtn.addEventListener("click", function () {
+    var data = { jobs: jobs, employers: employers, plans: plans, savedAt: new Date().toISOString() };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var stamp = toISODate(new Date());
+    a.href = url;
+    a.download = "labour-planner-backup-" + stamp + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showBackupMsg("Backup downloaded.", true);
+  });
+
+  backupRestoreBtn.addEventListener("click", function () {
+    backupFileInput.value = "";
+    backupFileInput.click();
+  });
+
+  backupFileInput.addEventListener("change", function () {
+    var file = backupFileInput.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data;
+      try {
+        data = JSON.parse(reader.result);
+      } catch (e) {
+        showBackupMsg("That file isn't a valid backup (couldn't read it as JSON).", false);
+        return;
+      }
+      if (!data || typeof data !== "object" || !Array.isArray(data.jobs) || !Array.isArray(data.employers) || typeof data.plans !== "object") {
+        showBackupMsg("That file doesn't look like a Weekly Labour Planner backup.", false);
+        return;
+      }
+      if (!window.confirm("This will replace all jobs, employers and tasks currently in this browser with the backup. Continue?")) {
+        return;
+      }
+
+      jobs = data.jobs;
+      employers = data.employers;
+      plans = data.plans || {};
+      migrateOldEmployerField(plans);
+      saveJobs();
+      saveEmployers();
+      savePlans();
+
+      renderJobOptions();
+      renderEmployerCheckboxes();
+      populateDateSelect();
+      renderResults();
+      showBackupMsg("Backup restored.", true);
+    };
+    reader.onerror = function () {
+      showBackupMsg("Couldn't read that file.", false);
+    };
+    reader.readAsText(file);
   });
 
   // ---------- Init ----------
