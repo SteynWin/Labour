@@ -19,7 +19,7 @@
   // ---------- State ----------
   var jobs = loadJSON(STORAGE.jobs, []);
   var employers = loadJSON(STORAGE.employers, []);
-  var plans = loadJSON(STORAGE.plans, {}); // keyed by week-start ISO date
+  var plans = loadJSON(STORAGE.plans, {}); // keyed by week-start ISO date -> { Mon: [entry,...], ... }
   var currentWeekStart = null; // ISO date string (Monday)
 
   // ---------- Storage helpers ----------
@@ -74,8 +74,14 @@
 
   function formatDisplayDate(date) {
     return date.toLocaleDateString(undefined, {
-      weekday: undefined,
       year: "numeric",
+      month: "short",
+      day: "numeric"
+    });
+  }
+
+  function formatShortDayDate(date, dayKey) {
+    return DAY_NAMES[dayKey].slice(0, 3) + ", " + date.toLocaleDateString(undefined, {
       month: "short",
       day: "numeric"
     });
@@ -84,9 +90,7 @@
   // ---------- Plan helpers ----------
   function emptyPlan() {
     var plan = {};
-    DAY_KEYS.forEach(function (k) {
-      plan[k] = [{ job: "", description: "", employer: "" }];
-    });
+    DAY_KEYS.forEach(function (k) { plan[k] = []; });
     return plan;
   }
 
@@ -97,110 +101,30 @@
     return plans[currentWeekStart];
   }
 
+  function makeId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
   // ---------- DOM refs ----------
-  var jobForm = document.getElementById("jobForm");
-  var jobInput = document.getElementById("jobInput");
-  var jobListEl = document.getElementById("jobList");
-
-  var employerForm = document.getElementById("employerForm");
-  var employerInput = document.getElementById("employerInput");
-  var employerListEl = document.getElementById("employerList");
-
-  var setupToggle = document.getElementById("setupToggle");
-  var setupBody = document.getElementById("setupBody");
-
   var weekStartInput = document.getElementById("weekStart");
   var weekRangeLabel = document.getElementById("weekRangeLabel");
 
-  var daysContainer = document.getElementById("daysContainer");
-  var formErrors = document.getElementById("formErrors");
-  var generateBtn = document.getElementById("generateBtn");
+  var entryForm = document.getElementById("entryForm");
+  var dateSelect = document.getElementById("dateSelect");
+  var jobSelect = document.getElementById("jobSelect");
+  var employerSelect = document.getElementById("employerSelect");
+  var taskInput = document.getElementById("taskInput");
+  var entryErrors = document.getElementById("entryErrors");
 
-  var planningSection = document.getElementById("planningSection");
-  var resultsSection = document.getElementById("resultsSection");
+  var jobAddBtn = document.getElementById("jobAddBtn");
+  var jobDelBtn = document.getElementById("jobDelBtn");
+  var empAddBtn = document.getElementById("empAddBtn");
+  var empDelBtn = document.getElementById("empDelBtn");
+
   var resultsBody = document.getElementById("resultsBody");
   var resultsWeekRange = document.getElementById("resultsWeekRange");
-  var editBtn = document.getElementById("editBtn");
   var exportBtn = document.getElementById("exportBtn");
-
-  // ---------- Setup: Jobs & Employers ----------
-  function renderChipList(container, items, onRemove) {
-    container.innerHTML = "";
-    if (items.length === 0) {
-      var li = document.createElement("li");
-      li.className = "empty-hint";
-      li.textContent = "None added yet";
-      container.appendChild(li);
-      return;
-    }
-    items.forEach(function (name, idx) {
-      var li = document.createElement("li");
-      var span = document.createElement("span");
-      span.textContent = name;
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.setAttribute("aria-label", "Remove " + name);
-      btn.textContent = "×";
-      btn.addEventListener("click", function () {
-        onRemove(idx);
-      });
-      li.appendChild(span);
-      li.appendChild(btn);
-      container.appendChild(li);
-    });
-  }
-
-  function renderJobsList() {
-    renderChipList(jobListEl, jobs, function (idx) {
-      jobs.splice(idx, 1);
-      saveJobs();
-      renderJobsList();
-      renderDays();
-    });
-  }
-
-  function renderEmployersList() {
-    renderChipList(employerListEl, employers, function (idx) {
-      employers.splice(idx, 1);
-      saveEmployers();
-      renderEmployersList();
-      renderDays();
-    });
-  }
-
-  jobForm.addEventListener("submit", function (e) {
-    e.preventDefault();
-    var val = jobInput.value.trim();
-    if (!val) return;
-    if (jobs.indexOf(val) === -1) {
-      jobs.push(val);
-      saveJobs();
-      renderJobsList();
-      renderDays();
-    }
-    jobInput.value = "";
-    jobInput.focus();
-  });
-
-  employerForm.addEventListener("submit", function (e) {
-    e.preventDefault();
-    var val = employerInput.value.trim();
-    if (!val) return;
-    if (employers.indexOf(val) === -1) {
-      employers.push(val);
-      saveEmployers();
-      renderEmployersList();
-      renderDays();
-    }
-    employerInput.value = "";
-    employerInput.focus();
-  });
-
-  setupToggle.addEventListener("click", function () {
-    var expanded = setupToggle.getAttribute("aria-expanded") === "true";
-    setupToggle.setAttribute("aria-expanded", String(!expanded));
-    setupBody.classList.toggle("hidden", expanded);
-  });
+  var exportErrors = document.getElementById("exportErrors");
 
   // ---------- Week selector ----------
   function initWeek() {
@@ -230,12 +154,31 @@
     }
     currentWeekStart = iso;
     updateWeekRangeLabel();
-    renderDays();
-    hideResults();
+    populateDateSelect();
+    renderResults();
+    exportErrors.innerHTML = "";
   });
 
+  // ---------- Date dropdown (Mon-Fri of the selected week) ----------
+  function populateDateSelect() {
+    var monday = parseISODate(currentWeekStart);
+    var prevValue = dateSelect.value;
+    dateSelect.innerHTML = "";
+    DAY_KEYS.forEach(function (dayKey, idx) {
+      var d = addDays(monday, idx);
+      var opt = document.createElement("option");
+      opt.value = dayKey;
+      opt.textContent = formatShortDayDate(d, dayKey);
+      dateSelect.appendChild(opt);
+    });
+    if (DAY_KEYS.indexOf(prevValue) !== -1) {
+      dateSelect.value = prevValue;
+    }
+  }
+
   // ---------- Options builders ----------
-  function buildOptions(selectEl, list, selectedValue, placeholder) {
+  function buildOptions(selectEl, list, placeholder) {
+    var prevValue = selectEl.value;
     selectEl.innerHTML = "";
     var placeholderOpt = document.createElement("option");
     placeholderOpt.value = "";
@@ -245,248 +188,174 @@
       var opt = document.createElement("option");
       opt.value = name;
       opt.textContent = name;
-      if (name === selectedValue) opt.selected = true;
       selectEl.appendChild(opt);
     });
-    if (selectedValue && list.indexOf(selectedValue) === -1) {
-      var missingOpt = document.createElement("option");
-      missingOpt.value = selectedValue;
-      missingOpt.textContent = selectedValue + " (removed)";
-      missingOpt.selected = true;
-      selectEl.appendChild(missingOpt);
+    if (list.indexOf(prevValue) !== -1) {
+      selectEl.value = prevValue;
     }
   }
 
-  // ---------- Planning grid ----------
-  function renderDays() {
-    var plan = getCurrentPlan();
-    daysContainer.innerHTML = "";
-    var monday = parseISODate(currentWeekStart);
-
-    DAY_KEYS.forEach(function (dayKey, dayIdx) {
-      var dayDate = addDays(monday, dayIdx);
-      var card = document.createElement("div");
-      card.className = "day-card";
-      card.dataset.day = dayKey;
-
-      var header = document.createElement("div");
-      header.className = "day-card-header";
-      var nameSpan = document.createElement("span");
-      nameSpan.className = "day-name";
-      nameSpan.textContent = DAY_NAMES[dayKey];
-      var dateSpan = document.createElement("span");
-      dateSpan.className = "day-date";
-      dateSpan.textContent = formatDisplayDate(dayDate);
-      header.appendChild(nameSpan);
-      header.appendChild(dateSpan);
-      card.appendChild(header);
-
-      var rowsWrap = document.createElement("div");
-      rowsWrap.className = "task-rows";
-      card.appendChild(rowsWrap);
-
-      var addBar = document.createElement("div");
-      addBar.className = "add-row-bar";
-      var addBtn = document.createElement("button");
-      addBtn.type = "button";
-      addBtn.className = "add-row-btn";
-      addBtn.textContent = "+ Add task";
-      addBtn.addEventListener("click", function () {
-        plan[dayKey].push({ job: "", description: "", employer: "" });
-        savePlans();
-        renderDays();
-      });
-      addBar.appendChild(addBtn);
-      card.appendChild(addBar);
-
-      plan[dayKey].forEach(function (task, rowIdx) {
-        rowsWrap.appendChild(buildTaskRow(dayKey, rowIdx, task, plan[dayKey].length));
-      });
-
-      daysContainer.appendChild(card);
-    });
+  function renderJobOptions() {
+    buildOptions(jobSelect, jobs, jobs.length ? "Select job…" : "No jobs yet — click + Add");
   }
 
-  function buildTaskRow(dayKey, rowIdx, task, rowCount) {
-    var row = document.createElement("div");
-    row.className = "task-row";
-
-    // Job select
-    var jobWrap = document.createElement("div");
-    var jobLabel = document.createElement("label");
-    jobLabel.className = "field-label";
-    jobLabel.textContent = "Job";
-    var jobSelect = document.createElement("select");
-    buildOptions(jobSelect, jobs, task.job, "Select job…");
-    jobSelect.addEventListener("change", function () {
-      task.job = jobSelect.value;
-      savePlans();
-    });
-    jobWrap.appendChild(jobLabel);
-    jobWrap.appendChild(jobSelect);
-
-    // Task description
-    var descWrap = document.createElement("div");
-    var descLabel = document.createElement("label");
-    descLabel.className = "field-label";
-    descLabel.textContent = "What needs to be done";
-    var descInput = document.createElement("textarea");
-    descInput.rows = 1;
-    descInput.placeholder = "Describe the task…";
-    descInput.value = task.description || "";
-    descInput.addEventListener("input", function () {
-      task.description = descInput.value;
-      savePlans();
-    });
-    descWrap.appendChild(descLabel);
-    descWrap.appendChild(descInput);
-
-    // Employer select
-    var empWrap = document.createElement("div");
-    var empLabel = document.createElement("label");
-    empLabel.className = "field-label";
-    empLabel.textContent = "Employer";
-    var empSelect = document.createElement("select");
-    buildOptions(empSelect, employers, task.employer, "Select employer…");
-    empSelect.addEventListener("change", function () {
-      task.employer = empSelect.value;
-      savePlans();
-    });
-    empWrap.appendChild(empLabel);
-    empWrap.appendChild(empSelect);
-
-    row.appendChild(jobWrap);
-    row.appendChild(descWrap);
-    row.appendChild(empWrap);
-
-    // Remove button
-    var removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "remove-row-btn";
-    removeBtn.setAttribute("aria-label", "Remove this task");
-    removeBtn.textContent = "×";
-    removeBtn.disabled = rowCount <= 1;
-    removeBtn.title = rowCount <= 1 ? "Each day needs at least one task" : "Remove task";
-    removeBtn.addEventListener("click", function () {
-      var plan = getCurrentPlan();
-      if (plan[dayKey].length <= 1) return;
-      plan[dayKey].splice(rowIdx, 1);
-      savePlans();
-      renderDays();
-    });
-    row.appendChild(removeBtn);
-
-    return row;
+  function renderEmployerOptions() {
+    buildOptions(employerSelect, employers, employers.length ? "Select employer…" : "No employers yet — click + Add");
   }
 
-  // ---------- Validation ----------
-  function validatePlan(plan) {
-    var errors = [];
-    var missingDays = [];
-
-    DAY_KEYS.forEach(function (dayKey) {
-      var rows = plan[dayKey];
-      var validRows = rows.filter(function (t) {
-        return t.job && t.description.trim() && t.employer;
-      });
-      var hasIncomplete = rows.some(function (t) {
-        var any = t.job || t.description.trim() || t.employer;
-        var all = t.job && t.description.trim() && t.employer;
-        return any && !all;
-      });
-
-      if (validRows.length === 0) {
-        missingDays.push(DAY_NAMES[dayKey]);
-      } else if (hasIncomplete) {
-        errors.push(DAY_NAMES[dayKey] + " has an incomplete task row (job, task and employer are all required).");
-      }
-    });
-
-    if (missingDays.length > 0) {
-      errors.unshift("Every day (Mon–Fri) needs at least one complete task. Missing: " + missingDays.join(", ") + ".");
+  // ---------- Add / Delete job & employer ----------
+  jobAddBtn.addEventListener("click", function () {
+    var name = window.prompt("New job name:");
+    if (name === null) return;
+    name = name.trim();
+    if (!name) return;
+    if (jobs.indexOf(name) === -1) {
+      jobs.push(name);
+      saveJobs();
+      renderJobOptions();
     }
-
-    if (jobs.length === 0) {
-      errors.push("Add at least one job in Setup before generating the plan.");
-    }
-    if (employers.length === 0) {
-      errors.push("Add at least one employer in Setup before generating the plan.");
-    }
-
-    return { valid: errors.length === 0, errors: errors, missingDays: missingDays };
-  }
-
-  function markMissingDays(missingDays) {
-    var cards = daysContainer.querySelectorAll(".day-card");
-    cards.forEach(function (card) {
-      var dayKey = card.dataset.day;
-      var isMissing = missingDays.indexOf(DAY_NAMES[dayKey]) !== -1;
-      card.classList.toggle("day-missing", isMissing);
-    });
-  }
-
-  // ---------- Generate / Results ----------
-  generateBtn.addEventListener("click", function () {
-    var plan = getCurrentPlan();
-    var result = validatePlan(plan);
-    markMissingDays(result.missingDays);
-
-    if (!result.valid) {
-      formErrors.innerHTML =
-        "<strong>Please fix the following before generating the plan:</strong><ul>" +
-        result.errors.map(function (e) { return "<li>" + escapeHTML(e) + "</li>"; }).join("") +
-        "</ul>";
-      formErrors.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-
-    formErrors.innerHTML = "";
-    renderResults(plan);
-    showResults();
+    jobSelect.value = name;
   });
 
-  function escapeHTML(str) {
-    var div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
+  jobDelBtn.addEventListener("click", function () {
+    var name = jobSelect.value;
+    if (!name) {
+      window.alert("Select a job first, then click Delete.");
+      return;
+    }
+    if (!window.confirm('Delete job "' + name + '" from the list?')) return;
+    var idx = jobs.indexOf(name);
+    if (idx !== -1) {
+      jobs.splice(idx, 1);
+      saveJobs();
+      renderJobOptions();
+    }
+  });
 
-  function renderResults(plan) {
-    resultsBody.innerHTML = "";
+  empAddBtn.addEventListener("click", function () {
+    var name = window.prompt("New employer name:");
+    if (name === null) return;
+    name = name.trim();
+    if (!name) return;
+    if (employers.indexOf(name) === -1) {
+      employers.push(name);
+      saveEmployers();
+      renderEmployerOptions();
+    }
+    employerSelect.value = name;
+  });
+
+  empDelBtn.addEventListener("click", function () {
+    var name = employerSelect.value;
+    if (!name) {
+      window.alert("Select an employer first, then click Delete.");
+      return;
+    }
+    if (!window.confirm('Delete employer "' + name + '" from the list?')) return;
+    var idx = employers.indexOf(name);
+    if (idx !== -1) {
+      employers.splice(idx, 1);
+      saveEmployers();
+      renderEmployerOptions();
+    }
+  });
+
+  // ---------- Add entry ----------
+  entryForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var dayKey = dateSelect.value;
+    var job = jobSelect.value;
+    var employer = employerSelect.value;
+    var task = taskInput.value.trim();
+
+    var missing = [];
+    if (!job) missing.push("Job");
+    if (!task) missing.push("Task");
+    if (!employer) missing.push("Employer");
+
+    if (missing.length > 0) {
+      entryErrors.textContent = "Please fill in: " + missing.join(", ") + ".";
+      return;
+    }
+    entryErrors.textContent = "";
+
+    var plan = getCurrentPlan();
+    plan[dayKey].push({ id: makeId(), job: job, employer: employer, task: task });
+    savePlans();
+
+    taskInput.value = "";
+    taskInput.focus();
+    renderResults();
+    exportErrors.innerHTML = "";
+  });
+
+  // ---------- Results (live, grouped by day) ----------
+  function renderResults() {
+    var plan = getCurrentPlan();
     var monday = parseISODate(currentWeekStart);
+    resultsBody.innerHTML = "";
 
     DAY_KEYS.forEach(function (dayKey, dayIdx) {
-      var rows = plan[dayKey].filter(function (t) {
-        return t.job && t.description.trim() && t.employer;
-      });
-      if (rows.length === 0) return;
-
+      var rows = plan[dayKey];
       var dayDate = addDays(monday, dayIdx);
+
       var section = document.createElement("div");
       section.className = "results-day";
+      if (rows.length === 0) section.classList.add("results-day-empty");
 
       var h3 = document.createElement("h3");
       h3.textContent = DAY_NAMES[dayKey] + " — " + formatDisplayDate(dayDate);
       section.appendChild(h3);
 
+      if (rows.length === 0) {
+        var placeholder = document.createElement("p");
+        placeholder.className = "no-print empty-day-note";
+        placeholder.textContent = "No tasks added yet for this day.";
+        section.appendChild(placeholder);
+        resultsBody.appendChild(section);
+        return;
+      }
+
       var table = document.createElement("table");
       table.className = "results-table";
       var thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>Job</th><th>Task</th><th>Employer</th></tr>";
+      thead.innerHTML = "<tr><th>Job</th><th>Task</th><th>Employer</th><th class=\"no-print\"></th></tr>";
       table.appendChild(thead);
 
       var tbody = document.createElement("tbody");
-      rows.forEach(function (t) {
+      rows.forEach(function (entry) {
         var tr = document.createElement("tr");
+
         var jobTd = document.createElement("td");
-        jobTd.textContent = t.job;
+        jobTd.textContent = entry.job;
+
         var descTd = document.createElement("td");
-        descTd.textContent = t.description;
+        descTd.textContent = entry.task;
+
         var empTd = document.createElement("td");
-        empTd.textContent = t.employer;
+        empTd.textContent = entry.employer;
+
+        var actionTd = document.createElement("td");
+        actionTd.className = "no-print";
+        var delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "remove-row-btn";
+        delBtn.setAttribute("aria-label", "Remove this task");
+        delBtn.textContent = "×";
+        delBtn.addEventListener("click", function () {
+          var idx = plan[dayKey].findIndex(function (t) { return t.id === entry.id; });
+          if (idx !== -1) {
+            plan[dayKey].splice(idx, 1);
+            savePlans();
+            renderResults();
+          }
+        });
+        actionTd.appendChild(delBtn);
+
         tr.appendChild(jobTd);
         tr.appendChild(descTd);
         tr.appendChild(empTd);
+        tr.appendChild(actionTd);
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
@@ -497,28 +366,26 @@
     resultsWeekRange.textContent = weekRangeLabel.textContent;
   }
 
-  function showResults() {
-    planningSection.classList.add("hidden");
-    document.getElementById("setupSection").classList.add("hidden");
-    resultsSection.classList.remove("hidden");
-    resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function hideResults() {
-    resultsSection.classList.add("hidden");
-    planningSection.classList.remove("hidden");
-    document.getElementById("setupSection").classList.remove("hidden");
-  }
-
-  editBtn.addEventListener("click", hideResults);
-
+  // ---------- Export as PDF ----------
   exportBtn.addEventListener("click", function () {
+    var plan = getCurrentPlan();
+    var missingDays = DAY_KEYS.filter(function (k) { return plan[k].length === 0; })
+      .map(function (k) { return DAY_NAMES[k]; });
+
+    if (missingDays.length > 0) {
+      exportErrors.innerHTML = "<strong>Every day (Mon–Fri) needs at least one task before exporting.</strong> Missing: " +
+        missingDays.join(", ") + ".";
+      exportErrors.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    exportErrors.innerHTML = "";
     window.print();
   });
 
   // ---------- Init ----------
-  renderJobsList();
-  renderEmployersList();
+  renderJobOptions();
+  renderEmployerOptions();
   initWeek();
-  renderDays();
+  populateDateSelect();
+  renderResults();
 })();
