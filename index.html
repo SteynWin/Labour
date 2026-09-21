@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Labour Planner</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header no-print">
+  <h1>Weekly Labour Planner</h1>
+  <p class="subtitle">Allocate employers to jobs for each work day</p>
+</header>
+
+<main class="container">
+
+  <!-- SETUP: Jobs & Employers -->
+  <section class="card no-print" id="setupSection">
+    <button type="button" class="collapse-toggle" id="setupToggle" aria-expanded="true">
+      <span>Setup: Jobs &amp; Employers</span>
+      <span class="chevron">&#9662;</span>
+    </button>
+    <div class="collapse-body" id="setupBody">
+      <div class="setup-grid">
+        <div class="setup-col">
+          <h2>Jobs</h2>
+          <form id="jobForm" class="inline-form">
+            <input type="text" id="jobInput" placeholder="e.g. Site A - Fencing" autocomplete="off">
+            <button type="submit">Add Job</button>
+          </form>
+          <ul class="chip-list" id="jobList"></ul>
+        </div>
+        <div class="setup-col">
+          <h2>Employers</h2>
+          <form id="employerForm" class="inline-form">
+            <input type="text" id="employerInput" placeholder="e.g. John Smith" autocomplete="off">
+            <button type="submit">Add Employer</button>
+          </form>
+          <ul class="chip-list" id="employerList"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WEEK SELECTOR -->
+  <section class="card no-print">
+    <div class="week-select-row">
+      <label for="weekStart">Week starting (Monday)</label>
+      <input type="date" id="weekStart">
+      <span class="week-range" id="weekRangeLabel"></span>
+    </div>
+  </section>
+
+  <!-- PLANNING GRID -->
+  <section class="no-print" id="planningSection">
+    <div id="daysContainer" class="days-container"></div>
+
+    <div class="actions-bar">
+      <div id="formErrors" class="form-errors" role="alert"></div>
+      <button type="button" id="generateBtn" class="primary-btn">Generate Weekly Plan</button>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="resultsSection" class="hidden">
+    <div class="actions-bar no-print">
+      <button type="button" id="editBtn" class="secondary-btn">&larr; Edit Plan</button>
+      <button type="button" id="exportBtn" class="primary-btn">Export as PDF</button>
+    </div>
+
+    <div id="printArea" class="print-area">
+      <div class="print-header">
+        <h1>Weekly Labour Plan</h1>
+        <p id="resultsWeekRange" class="print-subtitle"></p>
+      </div>
+      <div id="resultsBody"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="app-footer no-print">
+  <p>Data is stored locally in your browser. Nothing is uploaded anywhere.</p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
