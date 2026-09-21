@@ -10,60 +10,28 @@
     Fri: "Friday"
   };
 
-  var STORAGE = {
-    jobs: "lp_jobs",
-    employers: "lp_employers",
-    plans: "lp_plans"
-  };
-
-  // ---------- State ----------
-  var jobs = loadJSON(STORAGE.jobs, []);
-  var employers = loadJSON(STORAGE.employers, []);
-  var plans = loadJSON(STORAGE.plans, {}); // keyed by week-start ISO date -> { Mon: [entry,...], ... }
+  // ---------- State (kept in sync from PlannerStore.onChange) ----------
+  var jobs = [];
+  var employers = [];
+  var plans = {}; // keyed by week-start ISO date -> { Mon: [entry,...], ... }
   var currentWeekStart = null; // ISO date string (Monday)
-  var editingEntry = null; // { id, dayKey } of the entry currently loaded into the form, or null
+  var editingEntry = null; // { id, dayKey, original } of the entry currently loaded into the form, or null
+  var pendingJobSelection = null;
+  var pendingEmployerSelections = [];
 
-  migrateOldEmployerField(plans);
-  savePlans();
-
-  // Migrate entries saved before employers became multi-select
-  // (old shape: entry.employer as a single string)
-  function migrateOldEmployerField(plansObj) {
-    Object.keys(plansObj).forEach(function (weekKey) {
-      var plan = plansObj[weekKey];
-      DAY_KEYS.forEach(function (dayKey) {
-        if (!Array.isArray(plan[dayKey])) return;
-        plan[dayKey].forEach(function (entry) {
-          if (!Array.isArray(entry.employers)) {
-            entry.employers = entry.employer ? [entry.employer] : [];
-            delete entry.employer;
-          }
-        });
-      });
-    });
+  function emptyPlan() {
+    var plan = {};
+    DAY_KEYS.forEach(function (k) { plan[k] = []; });
+    return plan;
   }
 
-  // ---------- Storage helpers ----------
-  function loadJSON(key, fallback) {
-    try {
-      var raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (e) {
-      return fallback;
-    }
+  function getPlanForRender() {
+    return plans[currentWeekStart] || emptyPlan();
   }
 
-  function saveJSON(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      // ignore quota / privacy-mode errors
-    }
+  function makeId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
-
-  function saveJobs() { saveJSON(STORAGE.jobs, jobs); }
-  function saveEmployers() { saveJSON(STORAGE.employers, employers); }
-  function savePlans() { saveJSON(STORAGE.plans, plans); }
 
   // ---------- Date helpers ----------
   function toISODate(d) {
@@ -108,27 +76,11 @@
     });
   }
 
-  // ---------- Plan helpers ----------
-  function emptyPlan() {
-    var plan = {};
-    DAY_KEYS.forEach(function (k) { plan[k] = []; });
-    return plan;
-  }
-
-  function getCurrentPlan() {
-    if (!plans[currentWeekStart]) {
-      plans[currentWeekStart] = emptyPlan();
-    }
-    return plans[currentWeekStart];
-  }
-
-  function makeId() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  }
-
   // ---------- DOM refs ----------
   var weekStartInput = document.getElementById("weekStart");
   var weekRangeLabel = document.getElementById("weekRangeLabel");
+  var syncStatus = document.getElementById("syncStatus");
+  var footerNote = document.getElementById("footerNote");
 
   var inputCard = document.getElementById("inputCard");
   var inputCardTitle = document.getElementById("inputCardTitle");
@@ -149,11 +101,34 @@
   var resultsWeekRange = document.getElementById("resultsWeekRange");
   var exportBtn = document.getElementById("exportBtn");
 
+  var backupText = document.querySelector(".backup-text p");
   var backupDownloadBtn = document.getElementById("backupDownloadBtn");
   var backupRestoreBtn = document.getElementById("backupRestoreBtn");
   var backupFileInput = document.getElementById("backupFileInput");
   var backupMsg = document.getElementById("backupMsg");
   var clearDataBtn = document.getElementById("clearDataBtn");
+
+  // ---------- Sync status ----------
+  var STATUS_LABELS = {
+    local: "Local only",
+    connecting: "Connecting…",
+    live: "Live — shared with your team",
+    offline: "Offline — will sync later",
+    error: "Sync error"
+  };
+
+  function handleStatusChange(status) {
+    syncStatus.textContent = STATUS_LABELS[status] || status;
+    syncStatus.className = "sync-status sync-status-" + status;
+
+    if (PlannerStore.isTeamSyncEnabled) {
+      backupText.textContent = "Shared live with everyone using this link. Download a backup regularly, or after finishing a week, to keep an extra copy safe.";
+      footerNote.textContent = "Data is shared in real time with everyone using this link.";
+    } else {
+      backupText.textContent = "Saved automatically in this browser. Download a backup regularly, or after finishing a week, to keep it safe or move it to another computer.";
+      footerNote.textContent = "Data is stored locally in your browser. Nothing is uploaded anywhere.";
+    }
+  }
 
   // ---------- Week selector ----------
   function initWeek() {
@@ -226,10 +201,21 @@
 
   function renderJobOptions() {
     buildOptions(jobSelect, jobs, jobs.length ? "Select job…" : "No jobs yet — click + Add");
+    if (pendingJobSelection && jobs.indexOf(pendingJobSelection) !== -1) {
+      jobSelect.value = pendingJobSelection;
+      pendingJobSelection = null;
+    }
   }
 
   function renderEmployerCheckboxes() {
     var checkedNames = getCheckedEmployers();
+    pendingEmployerSelections.forEach(function (n) {
+      if (employers.indexOf(n) !== -1 && checkedNames.indexOf(n) === -1) checkedNames.push(n);
+    });
+    pendingEmployerSelections = pendingEmployerSelections.filter(function (n) {
+      return employers.indexOf(n) === -1;
+    });
+
     employerCheckList.innerHTML = "";
 
     if (employers.length === 0) {
@@ -259,12 +245,7 @@
       delBtn.textContent = "×";
       delBtn.addEventListener("click", function () {
         if (!window.confirm('Delete team mate "' + name + '" from the list?')) return;
-        var idx = employers.indexOf(name);
-        if (idx !== -1) {
-          employers.splice(idx, 1);
-          saveEmployers();
-          renderEmployerCheckboxes();
-        }
+        PlannerStore.deleteEmployer(name);
       });
 
       row.appendChild(label);
@@ -284,12 +265,8 @@
     if (name === null) return;
     name = name.trim();
     if (!name) return;
-    if (jobs.indexOf(name) === -1) {
-      jobs.push(name);
-      saveJobs();
-      renderJobOptions();
-    }
-    jobSelect.value = name;
+    pendingJobSelection = name;
+    PlannerStore.addJob(name);
   });
 
   jobDelBtn.addEventListener("click", function () {
@@ -299,12 +276,7 @@
       return;
     }
     if (!window.confirm('Delete job "' + name + '" from the list?')) return;
-    var idx = jobs.indexOf(name);
-    if (idx !== -1) {
-      jobs.splice(idx, 1);
-      saveJobs();
-      renderJobOptions();
-    }
+    PlannerStore.deleteJob(name);
   });
 
   empAddBtn.addEventListener("click", function () {
@@ -312,22 +284,13 @@
     if (name === null) return;
     name = name.trim();
     if (!name) return;
-    var checkedNames = getCheckedEmployers();
-    if (employers.indexOf(name) === -1) {
-      employers.push(name);
-      saveEmployers();
-    }
-    checkedNames.push(name);
-    renderEmployerCheckboxes();
-    checkedNames.forEach(function (n) {
-      var box = employerCheckList.querySelector('input[value="' + CSS.escape(n) + '"]');
-      if (box) box.checked = true;
-    });
+    pendingEmployerSelections.push(name);
+    PlannerStore.addEmployer(name);
   });
 
   // ---------- Add / Edit entry ----------
   function enterEditMode(entry, dayKey) {
-    editingEntry = { id: entry.id, dayKey: dayKey };
+    editingEntry = { id: entry.id, dayKey: dayKey, original: entry };
     dateSelect.value = dayKey;
     jobSelect.value = entry.job;
     var boxes = employerCheckList.querySelectorAll('input[type="checkbox"]');
@@ -381,35 +344,36 @@
     }
     entryErrors.textContent = "";
 
-    var plan = getCurrentPlan();
-
     if (editingEntry) {
-      var oldRows = plan[editingEntry.dayKey] || [];
-      var idx = oldRows.findIndex(function (t) { return t.id === editingEntry.id; });
-      var entryObj = idx !== -1 ? oldRows.splice(idx, 1)[0] : { id: editingEntry.id };
-      entryObj.job = job;
-      entryObj.employers = selectedEmployers;
-      entryObj.task = task;
-      plan[dayKey].push(entryObj);
+      PlannerStore.removeTaskEntry(currentWeekStart, editingEntry.dayKey, editingEntry.original);
+      PlannerStore.addTaskEntry(currentWeekStart, dayKey, {
+        id: editingEntry.id,
+        job: job,
+        employers: selectedEmployers,
+        task: task
+      });
       exitEditMode();
     } else {
-      plan[dayKey].push({ id: makeId(), job: job, employers: selectedEmployers, task: task });
+      PlannerStore.addTaskEntry(currentWeekStart, dayKey, {
+        id: makeId(),
+        job: job,
+        employers: selectedEmployers,
+        task: task
+      });
     }
 
-    savePlans();
     resetEntryFormAfterSave();
     taskInput.focus();
-    renderResults();
   });
 
   // ---------- Results (live, grouped by day) ----------
   function renderResults() {
-    var plan = getCurrentPlan();
+    var plan = getPlanForRender();
     var monday = parseISODate(currentWeekStart);
     resultsBody.innerHTML = "";
 
     DAY_KEYS.forEach(function (dayKey, dayIdx) {
-      var rows = plan[dayKey];
+      var rows = plan[dayKey] || [];
       var dayDate = addDays(monday, dayIdx);
 
       var section = document.createElement("div");
@@ -468,15 +432,10 @@
         delBtn.setAttribute("aria-label", "Remove this task");
         delBtn.textContent = "×";
         delBtn.addEventListener("click", function () {
-          var idx = plan[dayKey].findIndex(function (t) { return t.id === entry.id; });
-          if (idx !== -1) {
-            plan[dayKey].splice(idx, 1);
-            savePlans();
-            if (editingEntry && editingEntry.id === entry.id) {
-              exitEditMode();
-              resetEntryFormAfterSave();
-            }
-            renderResults();
+          PlannerStore.removeTaskEntry(currentWeekStart, dayKey, entry);
+          if (editingEntry && editingEntry.id === entry.id) {
+            exitEditMode();
+            resetEntryFormAfterSave();
           }
         });
 
@@ -546,24 +505,16 @@
         showBackupMsg("That file doesn't look like a Weekly Labour Planner backup.", false);
         return;
       }
-      if (!window.confirm("This will replace all jobs, employers and tasks currently in this browser with the backup. Continue?")) {
+      var warnText = PlannerStore.isTeamSyncEnabled
+        ? "This will replace all jobs, team mates and tasks for EVERYONE sharing this link with the backup. Continue?"
+        : "This will replace all jobs, team mates and tasks currently in this browser with the backup. Continue?";
+      if (!window.confirm(warnText)) {
         return;
       }
 
-      jobs = data.jobs;
-      employers = data.employers;
-      plans = data.plans || {};
-      migrateOldEmployerField(plans);
-      saveJobs();
-      saveEmployers();
-      savePlans();
-
       exitEditMode();
       resetEntryFormAfterSave();
-      renderJobOptions();
-      renderEmployerCheckboxes();
-      populateDateSelect();
-      renderResults();
+      PlannerStore.overwriteAll({ jobs: data.jobs, employers: data.employers, plans: data.plans });
       showBackupMsg("Backup restored.", true);
     };
     reader.onerror = function () {
@@ -574,21 +525,32 @@
 
   clearDataBtn.addEventListener("click", function () {
     var weekLabel = weekRangeLabel.textContent;
-    if (!window.confirm("Clear all tasks for the week of " + weekLabel + " and start a new report? Your Job and Team Mate lists will be kept.")) {
+    var warnText = PlannerStore.isTeamSyncEnabled
+      ? "Clear all tasks for the week of " + weekLabel + " for EVERYONE sharing this link, and start a new report? Job and Team Mate lists will be kept."
+      : "Clear all tasks for the week of " + weekLabel + " and start a new report? Your Job and Team Mate lists will be kept.";
+    if (!window.confirm(warnText)) {
       return;
     }
-    plans[currentWeekStart] = emptyPlan();
-    savePlans();
     exitEditMode();
     resetEntryFormAfterSave();
-    renderResults();
+    PlannerStore.clearWeek(currentWeekStart);
     showBackupMsg("This week's report was cleared. Jobs and Team Mates were kept.", true);
   });
 
   // ---------- Init ----------
-  renderJobOptions();
-  renderEmployerCheckboxes();
   initWeek();
   populateDateSelect();
   renderResults();
+
+  PlannerStore.init({
+    onStatus: handleStatusChange,
+    onChange: function (state) {
+      jobs = state.jobs || [];
+      employers = state.employers || [];
+      plans = state.plans || {};
+      renderJobOptions();
+      renderEmployerCheckboxes();
+      renderResults();
+    }
+  });
 })();

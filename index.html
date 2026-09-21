@@ -15,6 +15,7 @@
       <h1>Weekly Labour Planner</h1>
       <p class="subtitle">Allocate team mates to jobs for each work day</p>
     </div>
+    <span id="syncStatus" class="sync-status sync-status-local">Local only</span>
   </div>
 </header>
 
@@ -109,9 +110,13 @@
 </main>
 
 <footer class="app-footer no-print">
-  <p>Data is stored locally in your browser. Nothing is uploaded anywhere.</p>
+  <p id="footerNote">Data is stored locally in your browser. Nothing is uploaded anywhere.</p>
 </footer>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="store.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
