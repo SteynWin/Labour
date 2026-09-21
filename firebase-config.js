@@ -11,10 +11,10 @@
 // as before - saved only in this browser (localStorage), no setup needed.
 
 window.FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyANrVkgn2KLcanhaLMoFLWYdPzbBsgbfBg",
+  authDomain: "weekly-labour-planning.firebaseapp.com",
+  projectId: "weekly-labour-planning",
+  storageBucket: "weekly-labour-planning.firebasestorage.app",
+  messagingSenderId: "36114444841",
+  appId: "1:36114444841:web:f04512d33746fba2fce238"
 };
