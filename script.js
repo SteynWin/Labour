@@ -22,6 +22,22 @@
   var plans = loadJSON(STORAGE.plans, {}); // keyed by week-start ISO date -> { Mon: [entry,...], ... }
   var currentWeekStart = null; // ISO date string (Monday)
 
+  // Migrate entries saved before employers became multi-select
+  // (old shape: entry.employer as a single string)
+  Object.keys(plans).forEach(function (weekKey) {
+    var plan = plans[weekKey];
+    DAY_KEYS.forEach(function (dayKey) {
+      if (!Array.isArray(plan[dayKey])) return;
+      plan[dayKey].forEach(function (entry) {
+        if (!Array.isArray(entry.employers)) {
+          entry.employers = entry.employer ? [entry.employer] : [];
+          delete entry.employer;
+        }
+      });
+    });
+  });
+  savePlans();
+
   // ---------- Storage helpers ----------
   function loadJSON(key, fallback) {
     try {
@@ -367,7 +383,7 @@
         descTd.textContent = entry.task;
 
         var empTd = document.createElement("td");
-        empTd.textContent = entry.employers.join(", ");
+        empTd.textContent = (entry.employers || []).join(", ");
 
         var actionTd = document.createElement("td");
         actionTd.className = "no-print";
