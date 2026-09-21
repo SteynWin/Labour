@@ -13,7 +13,7 @@
     <img src="assets/logo.png" alt="" class="app-logo">
     <div class="header-text">
       <h1>Weekly Labour Planner</h1>
-      <p class="subtitle">Allocate employers to jobs for each work day</p>
+      <p class="subtitle">Allocate team mates to jobs for each work day</p>
     </div>
   </div>
 </header>
@@ -27,22 +27,6 @@
       <input type="date" id="weekStart">
       <span class="week-range" id="weekRangeLabel"></span>
     </div>
-  </section>
-
-  <!-- BACKUP / RESTORE -->
-  <section class="card no-print backup-card">
-    <div class="backup-row">
-      <div class="backup-text">
-        <strong>Your data</strong>
-        <p>Saved automatically in this browser. Download a backup regularly, or after finishing a week, to keep it safe or move it to another computer.</p>
-      </div>
-      <div class="backup-actions">
-        <button type="button" id="backupDownloadBtn">Download Backup</button>
-        <button type="button" id="backupRestoreBtn">Restore Backup</button>
-        <input type="file" id="backupFileInput" accept="application/json" class="hidden">
-      </div>
-    </div>
-    <div id="backupMsg" class="form-errors" role="status"></div>
   </section>
 
   <!-- INPUT: add one task at a time -->
@@ -66,7 +50,7 @@
         </div>
 
         <div class="field-box">
-          <label>Employer(s)</label>
+          <label>Team Mate</label>
           <div class="checkbox-list" id="employerCheckList"></div>
           <div class="field-box-actions">
             <button type="button" id="empAddBtn">+ Add</button>
@@ -102,6 +86,23 @@
       </div>
       <div id="resultsBody"></div>
     </div>
+  </section>
+
+  <!-- BACKUP / RESTORE / CLEAR -->
+  <section class="card no-print backup-card">
+    <div class="backup-row">
+      <div class="backup-text">
+        <strong>Your data</strong>
+        <p>Saved automatically in this browser. Download a backup regularly, or after finishing a week, to keep it safe or move it to another computer.</p>
+      </div>
+      <div class="backup-actions">
+        <button type="button" id="backupDownloadBtn">Download Backup</button>
+        <button type="button" id="backupRestoreBtn">Restore Backup</button>
+        <button type="button" id="clearDataBtn" class="danger-btn">Clear Data</button>
+        <input type="file" id="backupFileInput" accept="application/json" class="hidden">
+      </div>
+    </div>
+    <div id="backupMsg" class="form-errors" role="status"></div>
   </section>
 
 </main>

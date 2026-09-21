@@ -148,6 +148,7 @@
   var backupRestoreBtn = document.getElementById("backupRestoreBtn");
   var backupFileInput = document.getElementById("backupFileInput");
   var backupMsg = document.getElementById("backupMsg");
+  var clearDataBtn = document.getElementById("clearDataBtn");
 
   // ---------- Week selector ----------
   function initWeek() {
@@ -228,7 +229,7 @@
     if (employers.length === 0) {
       var hint = document.createElement("p");
       hint.className = "checkbox-list-hint";
-      hint.textContent = "No employers yet — click + Add.";
+      hint.textContent = "No team mates yet — click + Add.";
       employerCheckList.appendChild(hint);
       return;
     }
@@ -251,7 +252,7 @@
       delBtn.setAttribute("aria-label", "Delete " + name);
       delBtn.textContent = "×";
       delBtn.addEventListener("click", function () {
-        if (!window.confirm('Delete employer "' + name + '" from the list?')) return;
+        if (!window.confirm('Delete team mate "' + name + '" from the list?')) return;
         var idx = employers.indexOf(name);
         if (idx !== -1) {
           employers.splice(idx, 1);
@@ -301,7 +302,7 @@
   });
 
   empAddBtn.addEventListener("click", function () {
-    var name = window.prompt("New employer name:");
+    var name = window.prompt("New team mate name:");
     if (name === null) return;
     name = name.trim();
     if (!name) return;
@@ -329,7 +330,7 @@
     var missing = [];
     if (!job) missing.push("Job");
     if (!task) missing.push("Task");
-    if (selectedEmployers.length === 0) missing.push("Employer");
+    if (selectedEmployers.length === 0) missing.push("Team Mate");
 
     if (missing.length > 0) {
       entryErrors.textContent = "Please fill in: " + missing.join(", ") + ".";
@@ -378,7 +379,7 @@
       var table = document.createElement("table");
       table.className = "results-table";
       var thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>Job</th><th>Task</th><th>Employer</th><th class=\"no-print\"></th></tr>";
+      thead.innerHTML = "<tr><th>Job</th><th>Task</th><th>Team Mate</th><th class=\"no-print\"></th></tr>";
       table.appendChild(thead);
 
       var tbody = document.createElement("tbody");
@@ -495,6 +496,17 @@
       showBackupMsg("Couldn't read that file.", false);
     };
     reader.readAsText(file);
+  });
+
+  clearDataBtn.addEventListener("click", function () {
+    var weekLabel = weekRangeLabel.textContent;
+    if (!window.confirm("Clear all tasks for the week of " + weekLabel + " and start a new report? Your Job and Team Mate lists will be kept.")) {
+      return;
+    }
+    plans[currentWeekStart] = emptyPlan();
+    savePlans();
+    renderResults();
+    showBackupMsg("This week's report was cleared. Jobs and Team Mates were kept.", true);
   });
 
   // ---------- Init ----------

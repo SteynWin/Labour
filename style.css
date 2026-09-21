@@ -116,6 +116,8 @@ body {
   white-space: nowrap;
 }
 .backup-actions button:hover { background: #efece6; }
+.backup-actions .danger-btn { color: var(--danger); border-color: #fecaca; }
+.backup-actions .danger-btn:hover { background: var(--danger-bg); }
 #backupMsg { margin-top: 8px; }
 
 /* Add-a-task input form */
