@@ -8,6 +8,31 @@
 </head>
 <body>
 
+<div id="pinGate" class="pin-gate no-print">
+  <div class="pin-gate-box">
+    <img src="assets/logo.png" alt="" class="pin-gate-logo">
+    <h2>Weekly Labour Planner</h2>
+    <p>Enter the access code to continue</p>
+    <form id="pinForm">
+      <input type="password" inputmode="numeric" pattern="[0-9]*" id="pinInput" placeholder="Code" autocomplete="off" maxlength="10">
+      <button type="submit">Unlock</button>
+    </form>
+    <p id="pinError" class="pin-gate-error"></p>
+  </div>
+</div>
+<script>
+  (function () {
+    try {
+      if (localStorage.getItem("lp_access_ok") === "1") {
+        document.getElementById("pinGate").style.display = "none";
+        return;
+      }
+    } catch (e) {}
+    document.body.classList.add("gate-locked");
+  })();
+</script>
+<script src="access-gate.js"></script>
+
 <header class="app-header no-print">
   <div class="header-inner">
     <img src="assets/logo.png" alt="" class="app-logo">

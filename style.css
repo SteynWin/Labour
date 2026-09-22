@@ -23,6 +23,58 @@ body {
   color: var(--text);
   line-height: 1.5;
 }
+body.gate-locked { overflow: hidden; }
+
+.pin-gate {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.pin-gate-box {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  max-width: 320px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+.pin-gate-logo { height: 48px; width: auto; margin-bottom: 14px; }
+.pin-gate-box h2 { margin: 0 0 4px; font-size: 1.2rem; color: var(--text); }
+.pin-gate-box p { margin: 0 0 18px; color: var(--muted); font-size: 0.9rem; }
+.pin-gate-box form { display: flex; flex-direction: column; gap: 10px; }
+.pin-gate-box input {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1.3rem;
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-family: inherit;
+}
+.pin-gate-box button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pin-gate-box button:hover { background: var(--accent-dark); }
+.pin-gate-error {
+  color: var(--danger) !important;
+  margin: 10px 0 0 !important;
+  font-size: 0.85rem;
+  min-height: 1em;
+}
 
 .app-header {
   background: var(--card-bg);
