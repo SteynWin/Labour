@@ -175,6 +175,49 @@
     var docRef = null;
     var state = { jobs: [], employers: [], plans: {} };
 
+    // Earlier versions wrote nested fields using dotted string keys with
+    // set(..., {merge:true}) (e.g. patch["plans.2026-09-21.Mon"] = ...).
+    // Firestore's set()+merge does NOT treat dots in a key as a nested path
+    // the way update() does - it creates a literal field named
+    // "plans.2026-09-21.Mon" sitting next to (not inside) the real "plans"
+    // field. That silently stranded every task entered while this bug was
+    // live. This finds any such stray fields on a loaded document, folds
+    // their data into the real nested "plans" map (never losing data), and
+    // schedules a cleanup write to delete the stray fields and fix "plans"
+    // in the database - so it heals itself the next time anyone opens the
+    // page, without anyone needing to do anything.
+    function migrateStrayDottedPlanFields(data) {
+      var plans = (data.plans && typeof data.plans === "object") ? JSON.parse(JSON.stringify(data.plans)) : {};
+      var strayKeys = [];
+
+      Object.keys(data).forEach(function (key) {
+        if (key === "plans" || key.indexOf("plans.") !== 0) return;
+        var parts = key.slice("plans.".length).split(".");
+        if (parts.length === 1) {
+          var week = parts[0];
+          if (!plans[week]) plans[week] = emptyPlan();
+          var weekData = data[key];
+          if (weekData && typeof weekData === "object") {
+            DAY_KEYS.forEach(function (d) {
+              var existing = plans[week][d];
+              var stray = weekData[d];
+              if (Array.isArray(stray) && stray.length > 0 && (!Array.isArray(existing) || existing.length === 0)) {
+                plans[week][d] = stray;
+              }
+            });
+          }
+          strayKeys.push(key);
+        } else if (parts.length === 2) {
+          var week2 = parts[0], day2 = parts[1];
+          if (!plans[week2]) plans[week2] = emptyPlan();
+          if (Array.isArray(data[key])) plans[week2][day2] = data[key];
+          strayKeys.push(key);
+        }
+      });
+
+      return { plans: plans, strayKeys: strayKeys };
+    }
+
     function handleSnapshot(snap) {
       if (!snap.exists) {
         docRef.set({ jobs: [], employers: [], plans: {} }, { merge: true }).catch(reportError);
@@ -183,12 +226,21 @@
       var data = snap.data() || {};
       state.jobs = data.jobs || [];
       state.employers = data.employers || [];
-      state.plans = data.plans || {};
-      var changed = migrateOldEmployerField(state.plans);
+
+      var migrated = migrateStrayDottedPlanFields(data);
+      state.plans = migrated.plans;
+      var employerFieldChanged = migrateOldEmployerField(state.plans);
+
       if (onStatus) onStatus(snap.metadata.fromCache ? "offline" : "live");
       if (onChange) onChange(state);
-      if (changed) {
-        docRef.set({ plans: state.plans }, { merge: true }).catch(reportError);
+
+      if (migrated.strayKeys.length > 0 || employerFieldChanged) {
+        var args = ["plans", state.plans];
+        migrated.strayKeys.forEach(function (key) {
+          args.push(new firebase.firestore.FieldPath(key));
+          args.push(firebase.firestore.FieldValue.delete());
+        });
+        docRef.update.apply(docRef, args).catch(reportError);
       }
     }
 
@@ -198,8 +250,11 @@
       console.error("PlannerStore (Firestore) error:", err);
     }
 
-    function dayFieldPath(weekStart, dayKey) {
-      return "plans." + weekStart + "." + dayKey;
+    function dayPatch(weekStart, dayKey, value) {
+      var patch = { plans: {} };
+      patch.plans[weekStart] = {};
+      patch.plans[weekStart][dayKey] = value;
+      return patch;
     }
 
     return {
@@ -238,18 +293,16 @@
         return docRef.set({ employers: firebase.firestore.FieldValue.arrayRemove(name) }, { merge: true }).catch(reportError);
       },
       addTaskEntry: function (weekStart, dayKey, entry) {
-        var patch = {};
-        patch[dayFieldPath(weekStart, dayKey)] = firebase.firestore.FieldValue.arrayUnion(entry);
+        var patch = dayPatch(weekStart, dayKey, firebase.firestore.FieldValue.arrayUnion(entry));
         return docRef.set(patch, { merge: true }).catch(reportError);
       },
       removeTaskEntry: function (weekStart, dayKey, entry) {
-        var patch = {};
-        patch[dayFieldPath(weekStart, dayKey)] = firebase.firestore.FieldValue.arrayRemove(entry);
+        var patch = dayPatch(weekStart, dayKey, firebase.firestore.FieldValue.arrayRemove(entry));
         return docRef.set(patch, { merge: true }).catch(reportError);
       },
       clearWeek: function (weekStart) {
-        var patch = {};
-        patch["plans." + weekStart] = emptyPlan();
+        var patch = { plans: {} };
+        patch.plans[weekStart] = emptyPlan();
         return docRef.set(patch, { merge: true }).catch(reportError);
       },
       overwriteAll: function (data) {
