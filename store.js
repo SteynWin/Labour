@@ -210,6 +210,14 @@
         try {
           firebase.initializeApp(window.FIREBASE_CONFIG);
           var db = firebase.firestore();
+          // Some networks (certain WiFi routers/firewalls) block or break
+          // the QUIC-based streaming connection Firestore tries by default,
+          // causing "transport errored" / QUIC_NETWORK_IDLE_TIMEOUT. This
+          // makes it detect that and fall back to a plain HTTP long-polling
+          // connection instead, which works everywhere.
+          if (db.settings) {
+            db.settings({ experimentalAutoDetectLongPolling: true });
+          }
           docRef = db.collection("labourPlanner").doc("shared");
           docRef.onSnapshot({ includeMetadataChanges: true }, handleSnapshot, reportError);
         } catch (e) {
