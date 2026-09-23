@@ -121,7 +121,12 @@ body.gate-locked { overflow: hidden; }
 .sync-status-offline { background: #fdf3e4; color: #b45309; }
 .sync-status-error { background: var(--danger-bg); color: var(--danger); }
 @media (max-width: 640px) {
-  .sync-status { font-size: 0.72rem; padding: 4px 9px; }
+  .app-header { padding: 12px 16px; }
+  .header-inner { flex-wrap: wrap; gap: 10px; }
+  .app-logo { height: 38px; }
+  .app-header h1 { font-size: 1.1rem; }
+  .app-header .subtitle { font-size: 0.78rem; }
+  .sync-status { flex-basis: 100%; font-size: 0.72rem; padding: 4px 9px; }
 }
 
 .container {
