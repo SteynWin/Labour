@@ -127,6 +127,15 @@ body.gate-locked { overflow: hidden; }
   .app-header h1 { font-size: 1.1rem; }
   .app-header .subtitle { font-size: 0.78rem; }
   .sync-status { flex-basis: 100%; font-size: 0.72rem; padding: 4px 9px; }
+
+  .backup-actions { width: 100%; }
+  .backup-actions button {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    padding: 10px 8px;
+    font-size: 0.8rem;
+    white-space: normal;
+  }
 }
 
 .container {
@@ -189,6 +198,7 @@ body.gate-locked { overflow: hidden; }
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 .backup-actions button {
   padding: 8px 14px;
