@@ -459,7 +459,15 @@
 
   // ---------- Export as PDF ----------
   exportBtn.addEventListener("click", function () {
-    window.print();
+    try {
+      if (typeof window.print !== "function") {
+        window.alert("This browser doesn't support window.print().");
+        return;
+      }
+      window.print();
+    } catch (err) {
+      window.alert("Export failed: " + (err && err.message ? err.message : String(err)));
+    }
   });
 
   // ---------- Backup / Restore ----------
