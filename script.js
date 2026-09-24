@@ -459,12 +459,14 @@
 
   // ---------- Export as PDF ----------
   exportBtn.addEventListener("click", function () {
+    window.alert("Button tapped. print type: " + typeof window.print);
     try {
       if (typeof window.print !== "function") {
         window.alert("This browser doesn't support window.print().");
         return;
       }
       window.print();
+      window.alert("window.print() finished without throwing.");
     } catch (err) {
       window.alert("Export failed: " + (err && err.message ? err.message : String(err)));
     }
