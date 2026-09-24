@@ -99,6 +99,7 @@
 
   var resultsBody = document.getElementById("resultsBody");
   var resultsWeekRange = document.getElementById("resultsWeekRange");
+  var printArea = document.getElementById("printArea");
   var exportBtn = document.getElementById("exportBtn");
 
   var backupText = document.querySelector(".backup-text p");
@@ -458,18 +459,41 @@
   }
 
   // ---------- Export as PDF ----------
+  // Generates and downloads an actual PDF file by rendering the page
+  // directly, rather than using the browser's print dialog - this works
+  // the same way on every device, including phones where printing itself
+  // is disabled or unavailable at the OS level.
   exportBtn.addEventListener("click", function () {
-    window.alert("Button tapped. print type: " + typeof window.print);
-    try {
-      if (typeof window.print !== "function") {
-        window.alert("This browser doesn't support window.print().");
-        return;
-      }
-      window.print();
-      window.alert("window.print() finished without throwing.");
-    } catch (err) {
-      window.alert("Export failed: " + (err && err.message ? err.message : String(err)));
+    if (typeof window.html2pdf !== "function") {
+      window.alert("The PDF export tool didn't load. Check your internet connection and try again.");
+      return;
     }
+    var originalLabel = exportBtn.textContent;
+    exportBtn.disabled = true;
+    exportBtn.textContent = "Preparing PDF…";
+    document.body.classList.add("exporting-pdf");
+
+    var filename = "labour-plan-" + currentWeekStart + ".pdf";
+    var opt = {
+      margin: 8,
+      filename: filename,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+    };
+
+    function finish() {
+      document.body.classList.remove("exporting-pdf");
+      exportBtn.disabled = false;
+      exportBtn.textContent = originalLabel;
+    }
+
+    window.html2pdf().set(opt).from(printArea).save()
+      .then(finish)
+      .catch(function (err) {
+        finish();
+        window.alert("Export failed: " + (err && err.message ? err.message : String(err)));
+      });
   });
 
   // ---------- Backup / Restore ----------
