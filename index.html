@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Weekly Labour Planner</title>
-<link rel="stylesheet" href="style.css">
+<!-- ASSET_VERSION: bump this number (and the matching ?v= below) every
+     time style.css/access-gate.js/store.js/script.js change, so browsers
+     that already cached the old files are forced to fetch the new ones
+     instead of silently keeping stale copies. -->
+<link rel="stylesheet" href="style.css?v=1">
 </head>
 <body>
 
@@ -31,7 +35,7 @@
     document.body.classList.add("gate-locked");
   })();
 </script>
-<script src="access-gate.js"></script>
+<script src="access-gate.js?v=1"></script>
 
 <header class="app-header no-print">
   <div class="header-inner">
@@ -154,7 +158,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.14.0/html2pdf.bundle.min.js"></script>
 <script src="firebase-config.js"></script>
-<script src="store.js"></script>
-<script src="script.js"></script>
+<script src="store.js?v=1"></script>
+<script src="script.js?v=1"></script>
 </body>
 </html>
