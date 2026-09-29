@@ -477,35 +477,31 @@ body.gate-locked { overflow: hidden; }
   background: var(--brand-tan-dark);
 }
 
-/* Reminders (shown at the bottom of the report) */
-.reminders-section {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+/* Reminder column: last column of the matrix, using the space left over
+   after the day columns (most visible in portrait mode). Each reminder for
+   that row's date gets its own line, with a small delete button. */
+.matrix-col-reminder {
+  width: 150px;
+  vertical-align: top;
 }
-.reminders-title {
-  margin: 0 0 10px;
-  font-size: 1.05rem;
-}
-.reminder-row {
+.matrix-reminder-line {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-.reminder-row:last-of-type { border-bottom: none; }
-.reminder-date {
-  flex-shrink: 0;
-  width: 110px;
-  font-weight: 600;
+  align-items: flex-start;
+  gap: 6px;
   font-size: 0.85rem;
-  color: var(--brand-tan-dark);
 }
-.reminder-text {
+.matrix-reminder-line span {
   flex: 1;
-  font-size: 0.9rem;
+  word-break: break-word;
 }
+.matrix-reminder-line .mini-del-btn {
+  padding: 2px 7px;
+  font-size: 0.85rem;
+}
+.matrix-reminder-line + .matrix-reminder-line {
+  margin-top: 4px;
+}
+
 .field-box-reminder {
   margin-top: 14px;
 }
@@ -594,11 +590,8 @@ body.gate-locked { overflow: hidden; }
   .matrix-day-col { width: 20px; min-width: 20px; padding: 3px 1px; }
   .matrix-date-num { font-size: 0.62rem; }
   .matrix-dot { width: 9px; height: 9px; }
-
-  .reminders-section { margin-top: 14px; padding-top: 8px; }
-  .reminders-title { font-size: 0.92rem; margin: 0 0 6px; }
-  .reminder-row { padding: 4px 0; }
-  .reminder-date, .reminder-text { font-size: 0.78rem; }
+  .matrix-col-reminder { width: 110px; }
+  .matrix-reminder-line { font-size: 0.72rem; }
 }
 
 /* Export as PDF: same look as print, applied via a class instead of
@@ -618,8 +611,5 @@ body.exporting-pdf .results-table th { background: #eee; }
 body.exporting-pdf .matrix-day-col { width: 20px; min-width: 20px; padding: 3px 1px; }
 body.exporting-pdf .matrix-date-num { font-size: 0.62rem; }
 body.exporting-pdf .matrix-dot { width: 9px; height: 9px; }
-body.exporting-pdf .reminders-section { margin-top: 14px; padding-top: 8px; }
-body.exporting-pdf .reminders-title { font-size: 0.92rem; margin: 0 0 6px; }
-body.exporting-pdf .reminder-row { padding: 4px 0; }
-body.exporting-pdf .reminder-date,
-body.exporting-pdf .reminder-text { font-size: 0.78rem; }
+body.exporting-pdf .matrix-col-reminder { width: 110px; }
+body.exporting-pdf .matrix-reminder-line { font-size: 0.72rem; }

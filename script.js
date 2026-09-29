@@ -106,7 +106,6 @@
   var printArea = document.getElementById("printArea");
   var exportBtn = document.getElementById("exportBtn");
 
-  var remindersList = document.getElementById("remindersList");
   var reminderForm = document.getElementById("reminderForm");
   var reminderTextInput = document.getElementById("reminderTextInput");
   var reminderErrors = document.getElementById("reminderErrors");
@@ -374,22 +373,40 @@
     taskInput.focus();
   });
 
-  // ---------- Results (matrix: one row per task, dots mark its date) ----------
+  // ---------- Results (matrix: one row per task, dots mark its date, plus
+  // a Reminder column at the end holding each date's reminder(s)) ----------
   function renderResults() {
     var dates = workingDates();
     resultsBody.innerHTML = "";
 
+    // Reminders only ever get a date from this same dateSelect, so every
+    // reminder's date always belongs to SOME fortnight's working days -
+    // just not necessarily the one currently being viewed.
+    var remindersByDate = {};
+    reminders.forEach(function (r) {
+      if (dates.indexOf(r.date) === -1) return;
+      (remindersByDate[r.date] = remindersByDate[r.date] || []).push(r);
+    });
+
     var rows = [];
     dates.forEach(function (dateISO) {
-      (plans[dateISO] || []).forEach(function (entry) {
-        rows.push({ date: dateISO, entry: entry });
-      });
+      var tasks = plans[dateISO] || [];
+      if (tasks.length > 0) {
+        tasks.forEach(function (entry, idx) {
+          // Show the date's reminder(s) once, alongside its first task row,
+          // rather than repeating them on every task row for that date.
+          rows.push({ date: dateISO, entry: entry, reminders: idx === 0 ? (remindersByDate[dateISO] || []) : [] });
+        });
+      } else if (remindersByDate[dateISO]) {
+        // A reminder with no task on its date still needs a row to live in.
+        rows.push({ date: dateISO, entry: null, reminders: remindersByDate[dateISO] });
+      }
     });
 
     if (rows.length === 0) {
       var empty = document.createElement("p");
       empty.className = "empty-day-note";
-      empty.textContent = "No tasks added yet for this fortnight.";
+      empty.textContent = "No tasks or reminders added yet for this fortnight.";
       resultsBody.appendChild(empty);
       resultsWeekRange.textContent = weekRangeLabel.textContent;
       return;
@@ -429,6 +446,11 @@
       th.appendChild(num);
       headRow.appendChild(th);
     });
+    var reminderTh = document.createElement("th");
+    reminderTh.className = "matrix-label-col matrix-col-reminder";
+    reminderTh.textContent = "Reminder";
+    headRow.appendChild(reminderTh);
+
     var actionsTh = document.createElement("th");
     actionsTh.className = "no-print matrix-actions-col";
     headRow.appendChild(actionsTh);
@@ -443,13 +465,15 @@
 
       var jobTd = document.createElement("td");
       jobTd.className = "matrix-col-job";
-      jobTd.textContent = entry.job;
       var descTd = document.createElement("td");
       descTd.className = "matrix-col-task";
-      descTd.textContent = entry.task;
       var empTd = document.createElement("td");
       empTd.className = "matrix-col-labour";
-      empTd.textContent = (entry.employers || []).join(", ");
+      if (entry) {
+        jobTd.textContent = entry.job;
+        descTd.textContent = entry.task;
+        empTd.textContent = (entry.employers || []).join(", ");
+      }
       tr.appendChild(jobTd);
       tr.appendChild(descTd);
       tr.appendChild(empTd);
@@ -465,36 +489,62 @@
         tr.appendChild(td);
       });
 
+      var reminderTd = document.createElement("td");
+      reminderTd.className = "matrix-col-reminder";
+      row.reminders.forEach(function (reminder) {
+        var line = document.createElement("div");
+        line.className = "matrix-reminder-line";
+
+        var textSpan = document.createElement("span");
+        textSpan.textContent = reminder.text;
+
+        var remDelBtn = document.createElement("button");
+        remDelBtn.type = "button";
+        remDelBtn.className = "mini-del-btn no-print";
+        remDelBtn.setAttribute("aria-label", "Remove this reminder");
+        remDelBtn.textContent = "×";
+        remDelBtn.addEventListener("click", function () {
+          PlannerStore.removeReminder(reminder);
+        });
+
+        line.appendChild(textSpan);
+        line.appendChild(remDelBtn);
+        reminderTd.appendChild(line);
+      });
+      tr.appendChild(reminderTd);
+
       var actionTd = document.createElement("td");
       actionTd.className = "no-print matrix-actions-col";
-      var actionsWrap = document.createElement("div");
-      actionsWrap.className = "row-actions";
+      if (entry) {
+        var actionsWrap = document.createElement("div");
+        actionsWrap.className = "row-actions";
 
-      var editBtn = document.createElement("button");
-      editBtn.type = "button";
-      editBtn.className = "edit-row-btn";
-      editBtn.setAttribute("aria-label", "Edit this task");
-      editBtn.textContent = "✎";
-      editBtn.addEventListener("click", function () {
-        enterEditMode(entry, dateISO);
-      });
+        var editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "edit-row-btn";
+        editBtn.setAttribute("aria-label", "Edit this task");
+        editBtn.textContent = "✎";
+        editBtn.addEventListener("click", function () {
+          enterEditMode(entry, dateISO);
+        });
 
-      var delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "remove-row-btn";
-      delBtn.setAttribute("aria-label", "Remove this task");
-      delBtn.textContent = "×";
-      delBtn.addEventListener("click", function () {
-        PlannerStore.removeTaskEntry(dateISO, entry);
-        if (editingEntry && editingEntry.id === entry.id) {
-          exitEditMode();
-          resetEntryFormAfterSave();
-        }
-      });
+        var delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "remove-row-btn";
+        delBtn.setAttribute("aria-label", "Remove this task");
+        delBtn.textContent = "×";
+        delBtn.addEventListener("click", function () {
+          PlannerStore.removeTaskEntry(dateISO, entry);
+          if (editingEntry && editingEntry.id === entry.id) {
+            exitEditMode();
+            resetEntryFormAfterSave();
+          }
+        });
 
-      actionsWrap.appendChild(editBtn);
-      actionsWrap.appendChild(delBtn);
-      actionTd.appendChild(actionsWrap);
+        actionsWrap.appendChild(editBtn);
+        actionsWrap.appendChild(delBtn);
+        actionTd.appendChild(actionsWrap);
+      }
       tr.appendChild(actionTd);
 
       tbody.appendChild(tr);
@@ -505,50 +555,8 @@
     resultsWeekRange.textContent = weekRangeLabel.textContent;
   }
 
-  // ---------- Reminders (date + description, shown at the bottom of the report) ----------
-  function renderReminders() {
-    remindersList.innerHTML = "";
-
-    if (reminders.length === 0) {
-      var empty = document.createElement("p");
-      empty.className = "empty-day-note no-print";
-      empty.textContent = "No reminders yet.";
-      remindersList.appendChild(empty);
-      return;
-    }
-
-    var sorted = reminders.slice().sort(function (a, b) {
-      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
-    });
-
-    sorted.forEach(function (reminder) {
-      var row = document.createElement("div");
-      row.className = "reminder-row";
-
-      var dateEl = document.createElement("span");
-      dateEl.className = "reminder-date";
-      dateEl.textContent = formatDisplayDate(parseISODate(reminder.date));
-
-      var textEl = document.createElement("span");
-      textEl.className = "reminder-text";
-      textEl.textContent = reminder.text;
-
-      var delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "remove-row-btn no-print";
-      delBtn.setAttribute("aria-label", "Remove this reminder");
-      delBtn.textContent = "×";
-      delBtn.addEventListener("click", function () {
-        PlannerStore.removeReminder(reminder);
-      });
-
-      row.appendChild(dateEl);
-      row.appendChild(textEl);
-      row.appendChild(delBtn);
-      remindersList.appendChild(row);
-    });
-  }
-
+  // ---------- Add a reminder (uses the Date field above; shown inline in
+  // the matrix's Reminder column, in the row for that date) ----------
   reminderForm.addEventListener("submit", function (e) {
     e.preventDefault();
     var dateVal = dateSelect.value;
@@ -688,7 +696,6 @@
   initFortnight();
   populateDateSelect();
   renderResults();
-  renderReminders();
 
   PlannerStore.init({
     onStatus: handleStatusChange,
@@ -700,7 +707,6 @@
       renderJobOptions();
       renderEmployerCheckboxes();
       renderResults();
-      renderReminders();
     }
   });
 })();
