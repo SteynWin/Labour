@@ -1,33 +1,17 @@
 (function () {
   "use strict";
 
-  var DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-  var DAY_NAMES = {
-    Mon: "Monday",
-    Tue: "Tuesday",
-    Wed: "Wednesday",
-    Thu: "Thursday",
-    Fri: "Friday"
-  };
+  var FORTNIGHT_LENGTH = 14;
+  var DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
 
   // ---------- State (kept in sync from PlannerStore.onChange) ----------
   var jobs = [];
   var employers = [];
-  var plans = {}; // keyed by week-start ISO date -> { Mon: [entry,...], ... }
-  var currentWeekStart = null; // ISO date string (Monday)
-  var editingEntry = null; // { id, dayKey, original } of the entry currently loaded into the form, or null
+  var plans = {}; // flat: ISO date -> [entry, ...]
+  var currentFortnightStart = null; // ISO date string (a Monday)
+  var editingEntry = null; // { id, date, original } of the entry currently loaded into the form, or null
   var pendingJobSelection = null;
   var pendingEmployerSelections = [];
-
-  function emptyPlan() {
-    var plan = {};
-    DAY_KEYS.forEach(function (k) { plan[k] = []; });
-    return plan;
-  }
-
-  function getPlanForRender() {
-    return plans[currentWeekStart] || emptyPlan();
-  }
 
   function makeId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -69,11 +53,21 @@
     });
   }
 
-  function formatShortDayDate(date, dayKey) {
-    return DAY_NAMES[dayKey].slice(0, 3) + ", " + date.toLocaleDateString(undefined, {
+  function formatShortDate(date) {
+    return date.toLocaleDateString(undefined, {
+      weekday: "short",
       month: "short",
       day: "numeric"
     });
+  }
+
+  function fortnightDates() {
+    var monday = parseISODate(currentFortnightStart);
+    var out = [];
+    for (var i = 0; i < FORTNIGHT_LENGTH; i++) {
+      out.push(toISODate(addDays(monday, i)));
+    }
+    return out;
   }
 
   // ---------- DOM refs ----------
@@ -123,26 +117,26 @@
     syncStatus.className = "sync-status sync-status-" + status;
 
     if (PlannerStore.isTeamSyncEnabled) {
-      backupText.textContent = "Shared live with everyone using this link. Download a backup regularly, or after finishing a week, to keep an extra copy safe.";
+      backupText.textContent = "Shared live with everyone using this link. Download a backup regularly, or after finishing a fortnight, to keep an extra copy safe.";
       footerNote.textContent = "Data is shared in real time with everyone using this link.";
     } else {
-      backupText.textContent = "Saved automatically in this browser. Download a backup regularly, or after finishing a week, to keep it safe or move it to another computer.";
+      backupText.textContent = "Saved automatically in this browser. Download a backup regularly, or after finishing a fortnight, to keep it safe or move it to another computer.";
       footerNote.textContent = "Data is stored locally in your browser. Nothing is uploaded anywhere.";
     }
   }
 
-  // ---------- Week selector ----------
-  function initWeek() {
+  // ---------- Fortnight selector ----------
+  function initFortnight() {
     var today = new Date();
     var monday = mondayOf(today);
-    currentWeekStart = toISODate(monday);
-    weekStartInput.value = currentWeekStart;
-    updateWeekRangeLabel();
+    currentFortnightStart = toISODate(monday);
+    weekStartInput.value = currentFortnightStart;
+    updateFortnightRangeLabel();
   }
 
-  function updateWeekRangeLabel() {
-    var start = parseISODate(currentWeekStart);
-    var end = addDays(start, 4);
+  function updateFortnightRangeLabel() {
+    var start = parseISODate(currentFortnightStart);
+    var end = addDays(start, FORTNIGHT_LENGTH - 1);
     var label = formatDisplayDate(start) + " – " + formatDisplayDate(end);
     weekRangeLabel.textContent = label;
     resultsWeekRange.textContent = label;
@@ -157,26 +151,24 @@
     if (iso !== raw) {
       weekStartInput.value = iso;
     }
-    currentWeekStart = iso;
-    updateWeekRangeLabel();
+    currentFortnightStart = iso;
+    updateFortnightRangeLabel();
     populateDateSelect();
     exitEditMode();
     renderResults();
   });
 
-  // ---------- Date dropdown (Mon-Fri of the selected week) ----------
+  // ---------- Date dropdown (14 days of the selected fortnight) ----------
   function populateDateSelect() {
-    var monday = parseISODate(currentWeekStart);
     var prevValue = dateSelect.value;
     dateSelect.innerHTML = "";
-    DAY_KEYS.forEach(function (dayKey, idx) {
-      var d = addDays(monday, idx);
+    fortnightDates().forEach(function (iso) {
       var opt = document.createElement("option");
-      opt.value = dayKey;
-      opt.textContent = formatShortDayDate(d, dayKey);
+      opt.value = iso;
+      opt.textContent = formatShortDate(parseISODate(iso));
       dateSelect.appendChild(opt);
     });
-    if (DAY_KEYS.indexOf(prevValue) !== -1) {
+    if (fortnightDates().indexOf(prevValue) !== -1) {
       dateSelect.value = prevValue;
     }
   }
@@ -201,7 +193,7 @@
   }
 
   function renderJobOptions() {
-    buildOptions(jobSelect, jobs, jobs.length ? "Select job…" : "No jobs yet — click + Add");
+    buildOptions(jobSelect, jobs, jobs.length ? "Select job/trade…" : "No jobs yet — click + Add");
     if (pendingJobSelection && jobs.indexOf(pendingJobSelection) !== -1) {
       jobSelect.value = pendingJobSelection;
       pendingJobSelection = null;
@@ -222,7 +214,7 @@
     if (employers.length === 0) {
       var hint = document.createElement("p");
       hint.className = "checkbox-list-hint";
-      hint.textContent = "No team mates yet — click + Add.";
+      hint.textContent = "No labour yet — click + Add.";
       employerCheckList.appendChild(hint);
       return;
     }
@@ -245,7 +237,7 @@
       delBtn.setAttribute("aria-label", "Delete " + name);
       delBtn.textContent = "×";
       delBtn.addEventListener("click", function () {
-        if (!window.confirm('Delete team mate "' + name + '" from the list?')) return;
+        if (!window.confirm('Delete "' + name + '" from the labour list?')) return;
         PlannerStore.deleteEmployer(name);
       });
 
@@ -262,7 +254,7 @@
 
   // ---------- Add / Delete job & employer ----------
   jobAddBtn.addEventListener("click", function () {
-    var name = window.prompt("New job name:");
+    var name = window.prompt("New job/trade name:");
     if (name === null) return;
     name = name.trim();
     if (!name) return;
@@ -273,15 +265,15 @@
   jobDelBtn.addEventListener("click", function () {
     var name = jobSelect.value;
     if (!name) {
-      window.alert("Select a job first, then click Delete.");
+      window.alert("Select a job/trade first, then click Delete.");
       return;
     }
-    if (!window.confirm('Delete job "' + name + '" from the list?')) return;
+    if (!window.confirm('Delete "' + name + '" from the list?')) return;
     PlannerStore.deleteJob(name);
   });
 
   empAddBtn.addEventListener("click", function () {
-    var name = window.prompt("New team mate name:");
+    var name = window.prompt("New labour/team mate name:");
     if (name === null) return;
     name = name.trim();
     if (!name) return;
@@ -290,9 +282,9 @@
   });
 
   // ---------- Add / Edit entry ----------
-  function enterEditMode(entry, dayKey) {
-    editingEntry = { id: entry.id, dayKey: dayKey, original: entry };
-    dateSelect.value = dayKey;
+  function enterEditMode(entry, dateISO) {
+    editingEntry = { id: entry.id, date: dateISO, original: entry };
+    dateSelect.value = dateISO;
     jobSelect.value = entry.job;
     var boxes = employerCheckList.querySelectorAll('input[type="checkbox"]');
     boxes.forEach(function (b) { b.checked = (entry.employers || []).indexOf(b.value) !== -1; });
@@ -329,15 +321,15 @@
 
   entryForm.addEventListener("submit", function (e) {
     e.preventDefault();
-    var dayKey = dateSelect.value;
+    var dateISO = dateSelect.value;
     var job = jobSelect.value;
     var selectedEmployers = getCheckedEmployers();
     var task = taskInput.value.trim();
 
     var missing = [];
-    if (!job) missing.push("Job");
+    if (!job) missing.push("Job/Trade");
     if (!task) missing.push("Task");
-    if (selectedEmployers.length === 0) missing.push("Team Mate");
+    if (selectedEmployers.length === 0) missing.push("Labour");
 
     if (missing.length > 0) {
       entryErrors.textContent = "Please fill in: " + missing.join(", ") + ".";
@@ -346,8 +338,8 @@
     entryErrors.textContent = "";
 
     if (editingEntry) {
-      PlannerStore.removeTaskEntry(currentWeekStart, editingEntry.dayKey, editingEntry.original);
-      PlannerStore.addTaskEntry(currentWeekStart, dayKey, {
+      PlannerStore.removeTaskEntry(editingEntry.date, editingEntry.original);
+      PlannerStore.addTaskEntry(dateISO, {
         id: editingEntry.id,
         job: job,
         employers: selectedEmployers,
@@ -355,7 +347,7 @@
       });
       exitEditMode();
     } else {
-      PlannerStore.addTaskEntry(currentWeekStart, dayKey, {
+      PlannerStore.addTaskEntry(dateISO, {
         id: makeId(),
         job: job,
         employers: selectedEmployers,
@@ -367,93 +359,126 @@
     taskInput.focus();
   });
 
-  // ---------- Results (live, grouped by day) ----------
+  // ---------- Results (matrix: one row per task, dots mark its date) ----------
   function renderResults() {
-    var plan = getPlanForRender();
-    var monday = parseISODate(currentWeekStart);
+    var dates = fortnightDates();
     resultsBody.innerHTML = "";
 
-    DAY_KEYS.forEach(function (dayKey, dayIdx) {
-      var rows = plan[dayKey] || [];
-      var dayDate = addDays(monday, dayIdx);
-
-      var section = document.createElement("div");
-      section.className = "results-day";
-      if (rows.length === 0) section.classList.add("results-day-empty");
-
-      var h3 = document.createElement("h3");
-      h3.textContent = DAY_NAMES[dayKey] + " — " + formatDisplayDate(dayDate);
-      section.appendChild(h3);
-
-      if (rows.length === 0) {
-        var placeholder = document.createElement("p");
-        placeholder.className = "no-print empty-day-note";
-        placeholder.textContent = "No tasks added yet for this day.";
-        section.appendChild(placeholder);
-        resultsBody.appendChild(section);
-        return;
-      }
-
-      var table = document.createElement("table");
-      table.className = "results-table";
-      var thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>Job</th><th>Task</th><th>Team Mate</th><th class=\"no-print\"></th></tr>";
-      table.appendChild(thead);
-
-      var tbody = document.createElement("tbody");
-      rows.forEach(function (entry) {
-        var tr = document.createElement("tr");
-
-        var jobTd = document.createElement("td");
-        jobTd.textContent = entry.job;
-
-        var descTd = document.createElement("td");
-        descTd.textContent = entry.task;
-
-        var empTd = document.createElement("td");
-        empTd.textContent = (entry.employers || []).join(", ");
-
-        var actionTd = document.createElement("td");
-        actionTd.className = "no-print";
-        var actionsWrap = document.createElement("div");
-        actionsWrap.className = "row-actions";
-
-        var editBtn = document.createElement("button");
-        editBtn.type = "button";
-        editBtn.className = "edit-row-btn";
-        editBtn.setAttribute("aria-label", "Edit this task");
-        editBtn.textContent = "✎";
-        editBtn.addEventListener("click", function () {
-          enterEditMode(entry, dayKey);
-        });
-
-        var delBtn = document.createElement("button");
-        delBtn.type = "button";
-        delBtn.className = "remove-row-btn";
-        delBtn.setAttribute("aria-label", "Remove this task");
-        delBtn.textContent = "×";
-        delBtn.addEventListener("click", function () {
-          PlannerStore.removeTaskEntry(currentWeekStart, dayKey, entry);
-          if (editingEntry && editingEntry.id === entry.id) {
-            exitEditMode();
-            resetEntryFormAfterSave();
-          }
-        });
-
-        actionsWrap.appendChild(editBtn);
-        actionsWrap.appendChild(delBtn);
-        actionTd.appendChild(actionsWrap);
-
-        tr.appendChild(jobTd);
-        tr.appendChild(descTd);
-        tr.appendChild(empTd);
-        tr.appendChild(actionTd);
-        tbody.appendChild(tr);
+    var rows = [];
+    dates.forEach(function (dateISO) {
+      (plans[dateISO] || []).forEach(function (entry) {
+        rows.push({ date: dateISO, entry: entry });
       });
-      table.appendChild(tbody);
-      section.appendChild(table);
-      resultsBody.appendChild(section);
     });
+
+    if (rows.length === 0) {
+      var empty = document.createElement("p");
+      empty.className = "empty-day-note";
+      empty.textContent = "No tasks added yet for this fortnight.";
+      resultsBody.appendChild(empty);
+      resultsWeekRange.textContent = weekRangeLabel.textContent;
+      return;
+    }
+
+    var table = document.createElement("table");
+    table.className = "results-table matrix-table";
+
+    var thead = document.createElement("thead");
+    var headRow1 = document.createElement("tr");
+    ["Job/Trade", "Task", "Labour"].forEach(function (label) {
+      var th = document.createElement("th");
+      th.className = "matrix-label-col";
+      th.rowSpan = 2;
+      th.textContent = label;
+      headRow1.appendChild(th);
+    });
+    dates.forEach(function (dateISO) {
+      var d = parseISODate(dateISO);
+      var th = document.createElement("th");
+      th.className = "matrix-day-col";
+      th.textContent = DAY_LETTERS[d.getDay() === 0 ? 6 : d.getDay() - 1];
+      headRow1.appendChild(th);
+    });
+    var actionsTh = document.createElement("th");
+    actionsTh.className = "no-print matrix-actions-col";
+    actionsTh.rowSpan = 2;
+    headRow1.appendChild(actionsTh);
+    thead.appendChild(headRow1);
+
+    var headRow2 = document.createElement("tr");
+    dates.forEach(function (dateISO) {
+      var d = parseISODate(dateISO);
+      var th = document.createElement("th");
+      th.className = "matrix-day-col matrix-date-num";
+      th.textContent = String(d.getDate());
+      headRow2.appendChild(th);
+    });
+    thead.appendChild(headRow2);
+    table.appendChild(thead);
+
+    var tbody = document.createElement("tbody");
+    rows.forEach(function (row) {
+      var entry = row.entry;
+      var dateISO = row.date;
+      var tr = document.createElement("tr");
+
+      var jobTd = document.createElement("td");
+      jobTd.textContent = entry.job;
+      var descTd = document.createElement("td");
+      descTd.textContent = entry.task;
+      var empTd = document.createElement("td");
+      empTd.textContent = (entry.employers || []).join(", ");
+      tr.appendChild(jobTd);
+      tr.appendChild(descTd);
+      tr.appendChild(empTd);
+
+      dates.forEach(function (d) {
+        var td = document.createElement("td");
+        td.className = "matrix-day-col";
+        if (d === dateISO) {
+          var dot = document.createElement("span");
+          dot.className = "matrix-dot";
+          td.appendChild(dot);
+        }
+        tr.appendChild(td);
+      });
+
+      var actionTd = document.createElement("td");
+      actionTd.className = "no-print matrix-actions-col";
+      var actionsWrap = document.createElement("div");
+      actionsWrap.className = "row-actions";
+
+      var editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "edit-row-btn";
+      editBtn.setAttribute("aria-label", "Edit this task");
+      editBtn.textContent = "✎";
+      editBtn.addEventListener("click", function () {
+        enterEditMode(entry, dateISO);
+      });
+
+      var delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "remove-row-btn";
+      delBtn.setAttribute("aria-label", "Remove this task");
+      delBtn.textContent = "×";
+      delBtn.addEventListener("click", function () {
+        PlannerStore.removeTaskEntry(dateISO, entry);
+        if (editingEntry && editingEntry.id === entry.id) {
+          exitEditMode();
+          resetEntryFormAfterSave();
+        }
+      });
+
+      actionsWrap.appendChild(editBtn);
+      actionsWrap.appendChild(delBtn);
+      actionTd.appendChild(actionsWrap);
+      tr.appendChild(actionTd);
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    resultsBody.appendChild(table);
 
     resultsWeekRange.textContent = weekRangeLabel.textContent;
   }
@@ -473,13 +498,13 @@
     exportBtn.textContent = "Preparing PDF…";
     document.body.classList.add("exporting-pdf");
 
-    var filename = "labour-plan-" + currentWeekStart + ".pdf";
+    var filename = "labour-plan-" + currentFortnightStart + ".pdf";
     var opt = {
-      margin: 8,
+      margin: 6,
       filename: filename,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
     };
 
     function finish() {
@@ -536,12 +561,12 @@
         return;
       }
       if (!data || typeof data !== "object" || !Array.isArray(data.jobs) || !Array.isArray(data.employers) || typeof data.plans !== "object") {
-        showBackupMsg("That file doesn't look like a Weekly Labour Planner backup.", false);
+        showBackupMsg("That file doesn't look like a Labour Planner backup.", false);
         return;
       }
       var warnText = PlannerStore.isTeamSyncEnabled
-        ? "This will replace all jobs, team mates and tasks for EVERYONE sharing this link with the backup. Continue?"
-        : "This will replace all jobs, team mates and tasks currently in this browser with the backup. Continue?";
+        ? "This will replace all jobs, labour and tasks for EVERYONE sharing this link with the backup. Continue?"
+        : "This will replace all jobs, labour and tasks currently in this browser with the backup. Continue?";
       if (!window.confirm(warnText)) {
         return;
       }
@@ -558,21 +583,21 @@
   });
 
   clearDataBtn.addEventListener("click", function () {
-    var weekLabel = weekRangeLabel.textContent;
+    var rangeLabel = weekRangeLabel.textContent;
     var warnText = PlannerStore.isTeamSyncEnabled
-      ? "Clear all tasks for the week of " + weekLabel + " for EVERYONE sharing this link, and start a new report? Job and Team Mate lists will be kept."
-      : "Clear all tasks for the week of " + weekLabel + " and start a new report? Your Job and Team Mate lists will be kept.";
+      ? "Clear all tasks for " + rangeLabel + " for EVERYONE sharing this link, and start a new report? Job and Labour lists will be kept."
+      : "Clear all tasks for " + rangeLabel + " and start a new report? Your Job and Labour lists will be kept.";
     if (!window.confirm(warnText)) {
       return;
     }
     exitEditMode();
     resetEntryFormAfterSave();
-    PlannerStore.clearWeek(currentWeekStart);
-    showBackupMsg("This week's report was cleared. Jobs and Team Mates were kept.", true);
+    PlannerStore.clearDates(fortnightDates());
+    showBackupMsg("This fortnight's report was cleared. Jobs and Labour were kept.", true);
   });
 
   // ---------- Init ----------
-  initWeek();
+  initFortnight();
   populateDateSelect();
   renderResults();
 

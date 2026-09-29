@@ -402,25 +402,20 @@ body.gate-locked { overflow: hidden; }
 .print-header h1 { margin: 0 0 4px; font-size: 1.5rem; }
 .print-subtitle { color: var(--muted); margin: 0; }
 
-.results-day {
-  margin-bottom: 22px;
-}
-.results-day h3 {
-  margin: 0 0 8px;
-  padding-bottom: 6px;
-  border-bottom: 2px solid var(--brand-tan);
-  font-size: 1.05rem;
-}
-.results-day-empty h3 { border-bottom-color: var(--border); color: var(--muted); }
 .empty-day-note {
   margin: 0;
   color: var(--muted);
   font-size: 0.88rem;
   font-style: italic;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.matrix-scroll {
+  overflow-x: auto;
 }
 
 .results-table {
-  width: 100%;
   border-collapse: collapse;
 }
 .results-table th, .results-table td {
@@ -428,14 +423,41 @@ body.gate-locked { overflow: hidden; }
   padding: 8px 10px;
   border: 1px solid var(--border);
   font-size: 0.9rem;
-  vertical-align: top;
+  vertical-align: middle;
 }
 .results-table th {
   background: #f7f5f1;
   font-weight: 600;
-  width: 25%;
 }
-.results-table th:nth-child(2) { width: 40%; }
+
+.matrix-table { table-layout: fixed; }
+.matrix-label-col { vertical-align: top; text-align: left; }
+.matrix-table td.matrix-label-col:nth-child(1),
+.matrix-table th.matrix-label-col:nth-child(1) { width: 110px; }
+.matrix-table td:nth-child(2),
+.matrix-table th:nth-child(2) { width: 170px; }
+.matrix-table td:nth-child(3),
+.matrix-table th:nth-child(3) { width: 110px; }
+.matrix-day-col {
+  width: 28px;
+  min-width: 28px;
+  text-align: center;
+  padding: 4px 2px;
+}
+.matrix-date-num {
+  font-weight: normal;
+  color: var(--muted);
+  font-size: 0.72rem;
+  background: #fff;
+}
+.matrix-actions-col { width: 64px; }
+.matrix-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--brand-tan-dark);
+}
 
 .row-actions {
   display: flex;
@@ -488,12 +510,12 @@ body.gate-locked { overflow: hidden; }
   .print-header h1 { font-size: 1.2rem; margin: 0 0 2px; }
   .print-subtitle { font-size: 0.82rem; }
 
-  .results-day { margin-bottom: 10px; page-break-inside: avoid; }
-  .results-day h3 { font-size: 0.92rem; margin: 0 0 4px; padding-bottom: 3px; }
-  .results-day-empty { display: none; }
-
-  .results-table th, .results-table td { padding: 4px 7px; font-size: 0.8rem; line-height: 1.25; }
+  .matrix-scroll { overflow-x: visible; }
+  .results-table th, .results-table td { padding: 3px 4px; font-size: 0.72rem; line-height: 1.2; }
   .results-table th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .matrix-day-col { width: 20px; min-width: 20px; padding: 3px 1px; }
+  .matrix-date-num { font-size: 0.62rem; }
+  .matrix-dot { width: 9px; height: 9px; }
 }
 
 /* Export as PDF: same look as print, applied via a class instead of
@@ -506,9 +528,10 @@ body.exporting-pdf .print-header { margin-bottom: 10px; }
 body.exporting-pdf .print-logo { height: 32px; margin-bottom: 4px; }
 body.exporting-pdf .print-header h1 { font-size: 1.2rem; margin: 0 0 2px; }
 body.exporting-pdf .print-subtitle { font-size: 0.82rem; }
-body.exporting-pdf .results-day { margin-bottom: 10px; }
-body.exporting-pdf .results-day h3 { font-size: 0.92rem; margin: 0 0 4px; padding-bottom: 3px; }
-body.exporting-pdf .results-day-empty { display: none; }
+body.exporting-pdf .matrix-scroll { overflow-x: visible; }
 body.exporting-pdf .results-table th,
-body.exporting-pdf .results-table td { padding: 4px 7px; font-size: 0.8rem; line-height: 1.25; }
+body.exporting-pdf .results-table td { padding: 3px 4px; font-size: 0.72rem; line-height: 1.2; }
 body.exporting-pdf .results-table th { background: #eee; }
+body.exporting-pdf .matrix-day-col { width: 20px; min-width: 20px; padding: 3px 1px; }
+body.exporting-pdf .matrix-date-num { font-size: 0.62rem; }
+body.exporting-pdf .matrix-dot { width: 9px; height: 9px; }

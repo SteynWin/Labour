@@ -6,16 +6,21 @@
  *
  *  - Firestore (team sync): once firebase-config.js has real values, data
  *    is stored in Firebase and every device that opens the page shares the
- *    same jobs, team mates and weekly plans in real time.
+ *    same jobs, team mates and plan in real time.
+ *
+ * Plans are stored FLAT, keyed directly by calendar date ("YYYY-MM-DD" ->
+ * array of entries). A "fortnight" (or any date range) is just a display
+ * window into this data, not a storage boundary - so switching which
+ * range you're viewing never hides or loses anything.
  *
  * Either way, callers use the same small API:
  *
  *   PlannerStore.init({ onChange: fn, onStatus: fn })
  *   PlannerStore.addJob(name) / deleteJob(name)
  *   PlannerStore.addEmployer(name) / deleteEmployer(name)
- *   PlannerStore.addTaskEntry(weekStart, dayKey, entry)
- *   PlannerStore.removeTaskEntry(weekStart, dayKey, entry)
- *   PlannerStore.clearWeek(weekStart)
+ *   PlannerStore.addTaskEntry(dateISO, entry)
+ *   PlannerStore.removeTaskEntry(dateISO, entry)
+ *   PlannerStore.clearDates(datesISOArray)
  *   PlannerStore.overwriteAll({ jobs, employers, plans })
  *
  * onChange(state) fires with the full { jobs, employers, plans } whenever
@@ -30,27 +35,58 @@
 (function () {
   "use strict";
 
-  var DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+  var OLD_DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
-  function emptyPlan() {
-    var plan = {};
-    DAY_KEYS.forEach(function (k) { plan[k] = []; });
-    return plan;
+  function pad2(n) { return n < 10 ? "0" + n : String(n); }
+  function toISODate(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+  function parseISODate(iso) {
+    var parts = iso.split("-").map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  function addDays(iso, n) {
+    var d = parseISODate(iso);
+    d.setDate(d.getDate() + n);
+    return toISODate(d);
+  }
+
+  // Older versions stored plans nested by week ("2026-09-21" -> {Mon:[...],
+  // Tue:[...], ...}). This flattens any such entries into the new
+  // date-keyed shape (never dropping data), leaving already-flat entries
+  // (plain arrays) untouched. Returns { plans, changed }.
+  function migrateOldWeekFormat(plansObj) {
+    var flat = {};
+    var changed = false;
+
+    Object.keys(plansObj).forEach(function (key) {
+      var val = plansObj[key];
+      if (Array.isArray(val)) {
+        flat[key] = (flat[key] || []).concat(val);
+        return;
+      }
+      if (val && typeof val === "object") {
+        changed = true;
+        OLD_DAY_KEYS.forEach(function (dayKey, idx) {
+          if (!Array.isArray(val[dayKey]) || val[dayKey].length === 0) return;
+          var iso = addDays(key, idx);
+          flat[iso] = (flat[iso] || []).concat(val[dayKey]);
+        });
+      }
+    });
+
+    return { plans: flat, changed: changed };
   }
 
   function migrateOldEmployerField(plansObj) {
     var changed = false;
-    Object.keys(plansObj).forEach(function (weekKey) {
-      var plan = plansObj[weekKey];
-      DAY_KEYS.forEach(function (dayKey) {
-        if (!Array.isArray(plan[dayKey])) return;
-        plan[dayKey].forEach(function (entry) {
-          if (!Array.isArray(entry.employers)) {
-            entry.employers = entry.employer ? [entry.employer] : [];
-            delete entry.employer;
-            changed = true;
-          }
-        });
+    Object.keys(plansObj).forEach(function (dateKey) {
+      var entries = plansObj[dateKey];
+      if (!Array.isArray(entries)) return;
+      entries.forEach(function (entry) {
+        if (!Array.isArray(entry.employers)) {
+          entry.employers = entry.employer ? [entry.employer] : [];
+          delete entry.employer;
+          changed = true;
+        }
       });
     });
     return changed;
@@ -88,6 +124,7 @@
       employers: loadJSON(STORAGE.employers, []),
       plans: loadJSON(STORAGE.plans, {})
     };
+    state.plans = migrateOldWeekFormat(state.plans).plans;
     migrateOldEmployerField(state.plans);
 
     function persist() {
@@ -134,24 +171,23 @@
         emit();
         return Promise.resolve();
       },
-      addTaskEntry: function (weekStart, dayKey, entry) {
-        if (!state.plans[weekStart]) state.plans[weekStart] = emptyPlan();
-        state.plans[weekStart][dayKey].push(entry);
+      addTaskEntry: function (dateISO, entry) {
+        if (!state.plans[dateISO]) state.plans[dateISO] = [];
+        state.plans[dateISO].push(entry);
         persist();
         emit();
         return Promise.resolve();
       },
-      removeTaskEntry: function (weekStart, dayKey, entry) {
-        if (!state.plans[weekStart]) return Promise.resolve();
-        var arr = state.plans[weekStart][dayKey] || [];
+      removeTaskEntry: function (dateISO, entry) {
+        var arr = state.plans[dateISO] || [];
         var idx = arr.findIndex(function (t) { return t.id === entry.id; });
         if (idx !== -1) arr.splice(idx, 1);
         persist();
         emit();
         return Promise.resolve();
       },
-      clearWeek: function (weekStart) {
-        state.plans[weekStart] = emptyPlan();
+      clearDates: function (datesISO) {
+        datesISO.forEach(function (d) { state.plans[d] = []; });
         persist();
         emit();
         return Promise.resolve();
@@ -159,7 +195,7 @@
       overwriteAll: function (data) {
         state.jobs = data.jobs || [];
         state.employers = data.employers || [];
-        state.plans = data.plans || {};
+        state.plans = migrateOldWeekFormat(data.plans || {}).plans;
         migrateOldEmployerField(state.plans);
         persist();
         emit();
@@ -175,49 +211,6 @@
     var docRef = null;
     var state = { jobs: [], employers: [], plans: {} };
 
-    // Earlier versions wrote nested fields using dotted string keys with
-    // set(..., {merge:true}) (e.g. patch["plans.2026-09-21.Mon"] = ...).
-    // Firestore's set()+merge does NOT treat dots in a key as a nested path
-    // the way update() does - it creates a literal field named
-    // "plans.2026-09-21.Mon" sitting next to (not inside) the real "plans"
-    // field. That silently stranded every task entered while this bug was
-    // live. This finds any such stray fields on a loaded document, folds
-    // their data into the real nested "plans" map (never losing data), and
-    // schedules a cleanup write to delete the stray fields and fix "plans"
-    // in the database - so it heals itself the next time anyone opens the
-    // page, without anyone needing to do anything.
-    function migrateStrayDottedPlanFields(data) {
-      var plans = (data.plans && typeof data.plans === "object") ? JSON.parse(JSON.stringify(data.plans)) : {};
-      var strayKeys = [];
-
-      Object.keys(data).forEach(function (key) {
-        if (key === "plans" || key.indexOf("plans.") !== 0) return;
-        var parts = key.slice("plans.".length).split(".");
-        if (parts.length === 1) {
-          var week = parts[0];
-          if (!plans[week]) plans[week] = emptyPlan();
-          var weekData = data[key];
-          if (weekData && typeof weekData === "object") {
-            DAY_KEYS.forEach(function (d) {
-              var existing = plans[week][d];
-              var stray = weekData[d];
-              if (Array.isArray(stray) && stray.length > 0 && (!Array.isArray(existing) || existing.length === 0)) {
-                plans[week][d] = stray;
-              }
-            });
-          }
-          strayKeys.push(key);
-        } else if (parts.length === 2) {
-          var week2 = parts[0], day2 = parts[1];
-          if (!plans[week2]) plans[week2] = emptyPlan();
-          if (Array.isArray(data[key])) plans[week2][day2] = data[key];
-          strayKeys.push(key);
-        }
-      });
-
-      return { plans: plans, strayKeys: strayKeys };
-    }
-
     function handleSnapshot(snap) {
       if (!snap.exists) {
         docRef.set({ jobs: [], employers: [], plans: {} }, { merge: true }).catch(reportError);
@@ -227,20 +220,18 @@
       state.jobs = data.jobs || [];
       state.employers = data.employers || [];
 
-      var migrated = migrateStrayDottedPlanFields(data);
+      var migrated = migrateOldWeekFormat(data.plans || {});
       state.plans = migrated.plans;
       var employerFieldChanged = migrateOldEmployerField(state.plans);
 
       if (onStatus) onStatus(snap.metadata.fromCache ? "offline" : "live");
       if (onChange) onChange(state);
 
-      if (migrated.strayKeys.length > 0 || employerFieldChanged) {
-        var args = ["plans", state.plans];
-        migrated.strayKeys.forEach(function (key) {
-          args.push(new firebase.firestore.FieldPath(key));
-          args.push(firebase.firestore.FieldValue.delete());
-        });
-        docRef.update.apply(docRef, args).catch(reportError);
+      if (migrated.changed || employerFieldChanged) {
+        // update() replaces the "plans" field's value outright (not a deep
+        // merge), so old week-shaped sub-objects are fully discarded in
+        // favour of the new flat date keys, in one clean write.
+        docRef.update({ plans: state.plans }).catch(reportError);
       }
     }
 
@@ -250,10 +241,9 @@
       console.error("PlannerStore (Firestore) error:", err);
     }
 
-    function dayPatch(weekStart, dayKey, value) {
+    function dayPatch(dateISO, value) {
       var patch = { plans: {} };
-      patch.plans[weekStart] = {};
-      patch.plans[weekStart][dayKey] = value;
+      patch.plans[dateISO] = value;
       return patch;
     }
 
@@ -292,24 +282,24 @@
       deleteEmployer: function (name) {
         return docRef.set({ employers: firebase.firestore.FieldValue.arrayRemove(name) }, { merge: true }).catch(reportError);
       },
-      addTaskEntry: function (weekStart, dayKey, entry) {
-        var patch = dayPatch(weekStart, dayKey, firebase.firestore.FieldValue.arrayUnion(entry));
+      addTaskEntry: function (dateISO, entry) {
+        var patch = dayPatch(dateISO, firebase.firestore.FieldValue.arrayUnion(entry));
         return docRef.set(patch, { merge: true }).catch(reportError);
       },
-      removeTaskEntry: function (weekStart, dayKey, entry) {
-        var patch = dayPatch(weekStart, dayKey, firebase.firestore.FieldValue.arrayRemove(entry));
+      removeTaskEntry: function (dateISO, entry) {
+        var patch = dayPatch(dateISO, firebase.firestore.FieldValue.arrayRemove(entry));
         return docRef.set(patch, { merge: true }).catch(reportError);
       },
-      clearWeek: function (weekStart) {
+      clearDates: function (datesISO) {
         var patch = { plans: {} };
-        patch.plans[weekStart] = emptyPlan();
+        datesISO.forEach(function (d) { patch.plans[d] = []; });
         return docRef.set(patch, { merge: true }).catch(reportError);
       },
       overwriteAll: function (data) {
         return docRef.set({
           jobs: data.jobs || [],
           employers: data.employers || [],
-          plans: data.plans || {}
+          plans: migrateOldWeekFormat(data.plans || {}).plans
         }).catch(reportError);
       }
     };

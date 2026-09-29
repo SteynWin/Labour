@@ -38,7 +38,7 @@
     <img src="assets/logo.png" alt="" class="app-logo">
     <div class="header-text">
       <h1>Weekly Labour Planner</h1>
-      <p class="subtitle">Allocate team mates to jobs for each work day</p>
+      <p class="subtitle">Allocate labour to jobs across a two-week schedule</p>
     </div>
     <span id="syncStatus" class="sync-status sync-status-local">Local only</span>
   </div>
@@ -46,10 +46,10 @@
 
 <main class="container">
 
-  <!-- WEEK SELECTOR -->
+  <!-- FORTNIGHT SELECTOR -->
   <section class="card no-print">
     <div class="week-select-row">
-      <label for="weekStart">Week starting (Monday)</label>
+      <label for="weekStart">Fortnight starting (Monday)</label>
       <input type="date" id="weekStart">
       <span class="week-range" id="weekRangeLabel"></span>
     </div>
@@ -67,7 +67,7 @@
         </div>
 
         <div class="field-box">
-          <label for="jobSelect">Job</label>
+          <label for="jobSelect">Job/Trade</label>
           <select id="jobSelect"></select>
           <div class="field-box-actions">
             <button type="button" id="jobAddBtn">+ Add</button>
@@ -76,7 +76,7 @@
         </div>
 
         <div class="field-box">
-          <label>Team Mate</label>
+          <label>Labour</label>
           <div class="checkbox-list" id="employerCheckList"></div>
           <div class="field-box-actions">
             <button type="button" id="empAddBtn">+ Add</button>
@@ -98,20 +98,22 @@
     </form>
   </section>
 
-  <!-- RESULTS: live, grouped by day -->
+  <!-- RESULTS: matrix, one row per task, dots mark its day -->
   <section id="resultsSection">
     <div class="actions-bar no-print">
-      <h2 class="card-title">Weekly Plan</h2>
+      <h2 class="card-title">Fortnight Plan</h2>
       <button type="button" id="exportBtn" class="primary-btn">Export as PDF</button>
     </div>
 
     <div id="printArea" class="print-area">
       <div class="print-header">
         <img src="assets/logo.png" alt="" class="print-logo">
-        <h1>Weekly Labour Plan</h1>
+        <h1>2-Week Labour Schedule</h1>
         <p id="resultsWeekRange" class="print-subtitle"></p>
       </div>
-      <div id="resultsBody"></div>
+      <div class="matrix-scroll">
+        <div id="resultsBody"></div>
+      </div>
     </div>
   </section>
 
@@ -120,7 +122,7 @@
     <div class="backup-row">
       <div class="backup-text">
         <strong>Your data</strong>
-        <p>Saved automatically in this browser. Download a backup regularly, or after finishing a week, to keep it safe or move it to another computer.</p>
+        <p>Saved automatically in this browser. Download a backup regularly, or after finishing a fortnight, to keep it safe or move it to another computer.</p>
       </div>
       <div class="backup-actions">
         <button type="button" id="backupDownloadBtn">Download Backup</button>
