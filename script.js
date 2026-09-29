@@ -70,6 +70,15 @@
     return out;
   }
 
+  // Mon-Fri only, across both weeks (10 dates) - weekends are left out of
+  // both the date picker and the report matrix.
+  function workingDates() {
+    return fortnightDates().filter(function (iso) {
+      var dow = parseISODate(iso).getDay();
+      return dow !== 0 && dow !== 6;
+    });
+  }
+
   // ---------- DOM refs ----------
   var weekStartInput = document.getElementById("weekStart");
   var weekRangeLabel = document.getElementById("weekRangeLabel");
@@ -158,17 +167,17 @@
     renderResults();
   });
 
-  // ---------- Date dropdown (14 days of the selected fortnight) ----------
+  // ---------- Date dropdown (10 weekdays of the selected fortnight) ----------
   function populateDateSelect() {
     var prevValue = dateSelect.value;
     dateSelect.innerHTML = "";
-    fortnightDates().forEach(function (iso) {
+    workingDates().forEach(function (iso) {
       var opt = document.createElement("option");
       opt.value = iso;
       opt.textContent = formatShortDate(parseISODate(iso));
       dateSelect.appendChild(opt);
     });
-    if (fortnightDates().indexOf(prevValue) !== -1) {
+    if (workingDates().indexOf(prevValue) !== -1) {
       dateSelect.value = prevValue;
     }
   }
@@ -361,7 +370,7 @@
 
   // ---------- Results (matrix: one row per task, dots mark its date) ----------
   function renderResults() {
-    var dates = fortnightDates();
+    var dates = workingDates();
     resultsBody.innerHTML = "";
 
     var rows = [];
@@ -392,10 +401,10 @@
       th.textContent = label;
       headRow1.appendChild(th);
     });
-    dates.forEach(function (dateISO) {
+    dates.forEach(function (dateISO, idx) {
       var d = parseISODate(dateISO);
       var th = document.createElement("th");
-      th.className = "matrix-day-col";
+      th.className = "matrix-day-col" + (idx === 5 ? " week-sep" : "");
       th.textContent = DAY_LETTERS[d.getDay() === 0 ? 6 : d.getDay() - 1];
       headRow1.appendChild(th);
     });
@@ -406,10 +415,10 @@
     thead.appendChild(headRow1);
 
     var headRow2 = document.createElement("tr");
-    dates.forEach(function (dateISO) {
+    dates.forEach(function (dateISO, idx) {
       var d = parseISODate(dateISO);
       var th = document.createElement("th");
-      th.className = "matrix-day-col matrix-date-num";
+      th.className = "matrix-day-col matrix-date-num" + (idx === 5 ? " week-sep" : "");
       th.textContent = String(d.getDate());
       headRow2.appendChild(th);
     });
@@ -432,9 +441,9 @@
       tr.appendChild(descTd);
       tr.appendChild(empTd);
 
-      dates.forEach(function (d) {
+      dates.forEach(function (d, idx) {
         var td = document.createElement("td");
-        td.className = "matrix-day-col";
+        td.className = "matrix-day-col" + (idx === 5 ? " week-sep" : "");
         if (d === dateISO) {
           var dot = document.createElement("span");
           dot.className = "matrix-dot";

@@ -439,10 +439,13 @@ body.gate-locked { overflow: hidden; }
 .matrix-table td:nth-child(3),
 .matrix-table th:nth-child(3) { width: 110px; }
 .matrix-day-col {
-  width: 28px;
-  min-width: 28px;
+  width: 34px;
+  min-width: 34px;
   text-align: center;
   padding: 4px 2px;
+}
+.matrix-day-col.week-sep {
+  border-left: 3px solid var(--accent-dark);
 }
 .matrix-date-num {
   font-weight: normal;
@@ -495,6 +498,7 @@ body.gate-locked { overflow: hidden; }
 
 /* Print styles */
 @page {
+  size: landscape;
   margin: 12mm 10mm;
 }
 @media print {
