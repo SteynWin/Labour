@@ -114,6 +114,18 @@
       <div class="matrix-scroll">
         <div id="resultsBody"></div>
       </div>
+
+      <!-- REMINDERS: shown at the bottom of the report, included in PDF export -->
+      <div class="reminders-section">
+        <h2 class="reminders-title">Reminders</h2>
+        <div id="remindersList"></div>
+        <form id="reminderForm" class="reminder-form no-print">
+          <input type="date" id="reminderDateInput" aria-label="Reminder date">
+          <input type="text" id="reminderTextInput" placeholder="Reminder description" aria-label="Reminder description">
+          <button type="submit" class="primary-btn">+ Add Reminder</button>
+        </form>
+        <div id="reminderErrors" class="form-errors no-print" role="alert"></div>
+      </div>
     </div>
   </section>
 

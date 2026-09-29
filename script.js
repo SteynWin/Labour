@@ -8,6 +8,7 @@
   var jobs = [];
   var employers = [];
   var plans = {}; // flat: ISO date -> [entry, ...]
+  var reminders = []; // [{ id, date, text }, ...]
   var currentFortnightStart = null; // ISO date string (a Monday)
   var editingEntry = null; // { id, date, original } of the entry currently loaded into the form, or null
   var pendingJobSelection = null;
@@ -104,6 +105,12 @@
   var resultsWeekRange = document.getElementById("resultsWeekRange");
   var printArea = document.getElementById("printArea");
   var exportBtn = document.getElementById("exportBtn");
+
+  var remindersList = document.getElementById("remindersList");
+  var reminderForm = document.getElementById("reminderForm");
+  var reminderDateInput = document.getElementById("reminderDateInput");
+  var reminderTextInput = document.getElementById("reminderTextInput");
+  var reminderErrors = document.getElementById("reminderErrors");
 
   var backupText = document.querySelector(".backup-text p");
   var backupDownloadBtn = document.getElementById("backupDownloadBtn");
@@ -499,6 +506,69 @@
     resultsWeekRange.textContent = weekRangeLabel.textContent;
   }
 
+  // ---------- Reminders (date + description, shown at the bottom of the report) ----------
+  function renderReminders() {
+    remindersList.innerHTML = "";
+
+    if (reminders.length === 0) {
+      var empty = document.createElement("p");
+      empty.className = "empty-day-note no-print";
+      empty.textContent = "No reminders yet.";
+      remindersList.appendChild(empty);
+      return;
+    }
+
+    var sorted = reminders.slice().sort(function (a, b) {
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+
+    sorted.forEach(function (reminder) {
+      var row = document.createElement("div");
+      row.className = "reminder-row";
+
+      var dateEl = document.createElement("span");
+      dateEl.className = "reminder-date";
+      dateEl.textContent = formatDisplayDate(parseISODate(reminder.date));
+
+      var textEl = document.createElement("span");
+      textEl.className = "reminder-text";
+      textEl.textContent = reminder.text;
+
+      var delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "remove-row-btn no-print";
+      delBtn.setAttribute("aria-label", "Remove this reminder");
+      delBtn.textContent = "×";
+      delBtn.addEventListener("click", function () {
+        PlannerStore.removeReminder(reminder);
+      });
+
+      row.appendChild(dateEl);
+      row.appendChild(textEl);
+      row.appendChild(delBtn);
+      remindersList.appendChild(row);
+    });
+  }
+
+  reminderForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var dateVal = reminderDateInput.value;
+    var textVal = reminderTextInput.value.trim();
+
+    var missing = [];
+    if (!dateVal) missing.push("Date");
+    if (!textVal) missing.push("Description");
+    if (missing.length > 0) {
+      reminderErrors.textContent = "Please fill in: " + missing.join(", ") + ".";
+      return;
+    }
+    reminderErrors.textContent = "";
+
+    PlannerStore.addReminder({ id: makeId(), date: dateVal, text: textVal });
+    reminderForm.reset();
+    reminderTextInput.focus();
+  });
+
   // ---------- Export as PDF ----------
   // Generates and downloads an actual PDF file by rendering the page
   // directly, rather than using the browser's print dialog - this works
@@ -544,7 +614,7 @@
   }
 
   backupDownloadBtn.addEventListener("click", function () {
-    var data = { jobs: jobs, employers: employers, plans: plans, savedAt: new Date().toISOString() };
+    var data = { jobs: jobs, employers: employers, plans: plans, reminders: reminders, savedAt: new Date().toISOString() };
     var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
@@ -589,7 +659,7 @@
 
       exitEditMode();
       resetEntryFormAfterSave();
-      PlannerStore.overwriteAll({ jobs: data.jobs, employers: data.employers, plans: data.plans });
+      PlannerStore.overwriteAll({ jobs: data.jobs, employers: data.employers, plans: data.plans, reminders: Array.isArray(data.reminders) ? data.reminders : [] });
       showBackupMsg("Backup restored.", true);
     };
     reader.onerror = function () {
@@ -616,6 +686,7 @@
   initFortnight();
   populateDateSelect();
   renderResults();
+  renderReminders();
 
   PlannerStore.init({
     onStatus: handleStatusChange,
@@ -623,9 +694,11 @@
       jobs = state.jobs || [];
       employers = state.employers || [];
       plans = state.plans || {};
+      reminders = state.reminders || [];
       renderJobOptions();
       renderEmployerCheckboxes();
       renderResults();
+      renderReminders();
     }
   });
 })();

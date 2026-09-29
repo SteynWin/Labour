@@ -459,6 +459,57 @@ body.gate-locked { overflow: hidden; }
   background: var(--brand-tan-dark);
 }
 
+/* Reminders (shown at the bottom of the report) */
+.reminders-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.reminders-title {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+.reminder-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.reminder-row:last-of-type { border-bottom: none; }
+.reminder-date {
+  flex-shrink: 0;
+  width: 110px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--brand-tan-dark);
+}
+.reminder-text {
+  flex: 1;
+  font-size: 0.9rem;
+}
+.reminder-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.reminder-form input[type="date"],
+.reminder-form input[type="text"] {
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.reminder-form input[type="text"] {
+  flex: 1;
+  min-width: 160px;
+}
+@media (max-width: 640px) {
+  .reminder-form { flex-direction: column; align-items: stretch; }
+}
+
 .row-actions {
   display: flex;
   gap: 6px;
@@ -517,6 +568,11 @@ body.gate-locked { overflow: hidden; }
   .matrix-day-col { width: 20px; min-width: 20px; padding: 3px 1px; }
   .matrix-date-num { font-size: 0.62rem; }
   .matrix-dot { width: 9px; height: 9px; }
+
+  .reminders-section { margin-top: 14px; padding-top: 8px; }
+  .reminders-title { font-size: 0.92rem; margin: 0 0 6px; }
+  .reminder-row { padding: 4px 0; }
+  .reminder-date, .reminder-text { font-size: 0.78rem; }
 }
 
 /* Export as PDF: same look as print, applied via a class instead of
@@ -536,3 +592,8 @@ body.exporting-pdf .results-table th { background: #eee; }
 body.exporting-pdf .matrix-day-col { width: 20px; min-width: 20px; padding: 3px 1px; }
 body.exporting-pdf .matrix-date-num { font-size: 0.62rem; }
 body.exporting-pdf .matrix-dot { width: 9px; height: 9px; }
+body.exporting-pdf .reminders-section { margin-top: 14px; padding-top: 8px; }
+body.exporting-pdf .reminders-title { font-size: 0.92rem; margin: 0 0 6px; }
+body.exporting-pdf .reminder-row { padding: 4px 0; }
+body.exporting-pdf .reminder-date,
+body.exporting-pdf .reminder-text { font-size: 0.78rem; }

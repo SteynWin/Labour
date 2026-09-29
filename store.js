@@ -21,7 +21,8 @@
  *   PlannerStore.addTaskEntry(dateISO, entry)
  *   PlannerStore.removeTaskEntry(dateISO, entry)
  *   PlannerStore.clearDates(datesISOArray)
- *   PlannerStore.overwriteAll({ jobs, employers, plans })
+ *   PlannerStore.addReminder(entry) / removeReminder(entry)
+ *   PlannerStore.overwriteAll({ jobs, employers, plans, reminders })
  *
  * onChange(state) fires with the full { jobs, employers, plans } whenever
  * data changes - from this device or (in Firestore mode) from any other
@@ -100,7 +101,7 @@
 
   // ---------------- Local (localStorage) backend ----------------
   function LocalBackend() {
-    var STORAGE = { jobs: "lp_jobs", employers: "lp_employers", plans: "lp_plans" };
+    var STORAGE = { jobs: "lp_jobs", employers: "lp_employers", plans: "lp_plans", reminders: "lp_reminders" };
     var onChange = null;
 
     function loadJSON(key, fallback) {
@@ -122,7 +123,8 @@
     var state = {
       jobs: loadJSON(STORAGE.jobs, []),
       employers: loadJSON(STORAGE.employers, []),
-      plans: loadJSON(STORAGE.plans, {})
+      plans: loadJSON(STORAGE.plans, {}),
+      reminders: loadJSON(STORAGE.reminders, [])
     };
     state.plans = migrateOldWeekFormat(state.plans).plans;
     migrateOldEmployerField(state.plans);
@@ -131,6 +133,7 @@
       saveJSON(STORAGE.jobs, state.jobs);
       saveJSON(STORAGE.employers, state.employers);
       saveJSON(STORAGE.plans, state.plans);
+      saveJSON(STORAGE.reminders, state.reminders);
     }
 
     function emit() {
@@ -192,11 +195,25 @@
         emit();
         return Promise.resolve();
       },
+      addReminder: function (entry) {
+        state.reminders.push(entry);
+        persist();
+        emit();
+        return Promise.resolve();
+      },
+      removeReminder: function (entry) {
+        var idx = state.reminders.findIndex(function (r) { return r.id === entry.id; });
+        if (idx !== -1) state.reminders.splice(idx, 1);
+        persist();
+        emit();
+        return Promise.resolve();
+      },
       overwriteAll: function (data) {
         state.jobs = data.jobs || [];
         state.employers = data.employers || [];
         state.plans = migrateOldWeekFormat(data.plans || {}).plans;
         migrateOldEmployerField(state.plans);
+        state.reminders = data.reminders || [];
         persist();
         emit();
         return Promise.resolve();
@@ -209,16 +226,17 @@
     var onChange = null;
     var onStatus = null;
     var docRef = null;
-    var state = { jobs: [], employers: [], plans: {} };
+    var state = { jobs: [], employers: [], plans: {}, reminders: [] };
 
     function handleSnapshot(snap) {
       if (!snap.exists) {
-        docRef.set({ jobs: [], employers: [], plans: {} }, { merge: true }).catch(reportError);
+        docRef.set({ jobs: [], employers: [], plans: {}, reminders: [] }, { merge: true }).catch(reportError);
         return;
       }
       var data = snap.data() || {};
       state.jobs = data.jobs || [];
       state.employers = data.employers || [];
+      state.reminders = data.reminders || [];
 
       var migrated = migrateOldWeekFormat(data.plans || {});
       state.plans = migrated.plans;
@@ -295,11 +313,18 @@
         datesISO.forEach(function (d) { patch.plans[d] = []; });
         return docRef.set(patch, { merge: true }).catch(reportError);
       },
+      addReminder: function (entry) {
+        return docRef.set({ reminders: firebase.firestore.FieldValue.arrayUnion(entry) }, { merge: true }).catch(reportError);
+      },
+      removeReminder: function (entry) {
+        return docRef.set({ reminders: firebase.firestore.FieldValue.arrayRemove(entry) }, { merge: true }).catch(reportError);
+      },
       overwriteAll: function (data) {
         return docRef.set({
           jobs: data.jobs || [],
           employers: data.employers || [],
-          plans: migrateOldWeekFormat(data.plans || {}).plans
+          plans: migrateOldWeekFormat(data.plans || {}).plans,
+          reminders: data.reminders || []
         }).catch(reportError);
       }
     };
