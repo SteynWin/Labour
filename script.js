@@ -405,8 +405,8 @@
     // with no task on its date) sort to the end, chronologically among
     // themselves. Same-job rows stay in date order.
     rows.sort(function (a, b) {
-      var jobA = a.entry ? a.entry.job.toLowerCase() : null;
-      var jobB = b.entry ? b.entry.job.toLowerCase() : null;
+      var jobA = a.entry ? a.entry.job.trim().toLowerCase() : null;
+      var jobB = b.entry ? b.entry.job.trim().toLowerCase() : null;
       if (jobA === null && jobB === null) return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
       if (jobA === null) return 1;
       if (jobB === null) return -1;

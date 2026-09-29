@@ -420,9 +420,10 @@ body.gate-locked { overflow: hidden; }
 }
 .results-table th, .results-table td {
   text-align: left;
-  padding: 8px 10px;
+  padding: 5px 10px;
   border: 1px solid var(--border);
   font-size: 0.9rem;
+  line-height: 1.25;
   vertical-align: middle;
 }
 .results-table th {
