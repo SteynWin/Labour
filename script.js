@@ -392,14 +392,37 @@
     dates.forEach(function (dateISO) {
       var tasks = plans[dateISO] || [];
       if (tasks.length > 0) {
-        tasks.forEach(function (entry, idx) {
-          // Show the date's reminder(s) once, alongside its first task row,
-          // rather than repeating them on every task row for that date.
-          rows.push({ date: dateISO, entry: entry, reminders: idx === 0 ? (remindersByDate[dateISO] || []) : [] });
+        tasks.forEach(function (entry) {
+          rows.push({ date: dateISO, entry: entry });
         });
       } else if (remindersByDate[dateISO]) {
         // A reminder with no task on its date still needs a row to live in.
-        rows.push({ date: dateISO, entry: null, reminders: remindersByDate[dateISO] });
+        rows.push({ date: dateISO, entry: null });
+      }
+    });
+
+    // Sort by Job/Trade (case-insensitive); rows with no job (a reminder
+    // with no task on its date) sort to the end, chronologically among
+    // themselves. Same-job rows stay in date order.
+    rows.sort(function (a, b) {
+      var jobA = a.entry ? a.entry.job.toLowerCase() : null;
+      var jobB = b.entry ? b.entry.job.toLowerCase() : null;
+      if (jobA === null && jobB === null) return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+      if (jobA === null) return 1;
+      if (jobB === null) return -1;
+      if (jobA !== jobB) return jobA < jobB ? -1 : 1;
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+
+    // Attach each date's reminder(s) to the first row (in the now-sorted
+    // order) for that date, so they show once rather than on every row.
+    var usedReminderDates = {};
+    rows.forEach(function (row) {
+      if (remindersByDate[row.date] && !usedReminderDates[row.date]) {
+        row.reminders = remindersByDate[row.date];
+        usedReminderDates[row.date] = true;
+      } else {
+        row.reminders = [];
       }
     });
 
