@@ -488,27 +488,35 @@ body.gate-locked { overflow: hidden; }
   flex: 1;
   font-size: 0.9rem;
 }
-.reminder-form {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.field-box-reminder {
   margin-top: 14px;
 }
-.reminder-form input[type="date"],
-.reminder-form input[type="text"] {
+.reminder-inline-form {
+  display: flex;
+  gap: 8px;
+}
+.reminder-inline-form input[type="text"] {
+  flex: 1;
+  min-width: 0;
   padding: 8px 9px;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.9rem;
   font-family: inherit;
+  background: #fff;
 }
-.reminder-form input[type="text"] {
-  flex: 1;
-  min-width: 160px;
+.reminder-inline-form button {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--text);
+  white-space: nowrap;
 }
-@media (max-width: 640px) {
-  .reminder-form { flex-direction: column; align-items: stretch; }
-}
+.reminder-inline-form button:hover { background: #efece6; }
 
 .row-actions {
   display: flex;

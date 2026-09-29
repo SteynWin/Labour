@@ -108,7 +108,6 @@
 
   var remindersList = document.getElementById("remindersList");
   var reminderForm = document.getElementById("reminderForm");
-  var reminderDateInput = document.getElementById("reminderDateInput");
   var reminderTextInput = document.getElementById("reminderTextInput");
   var reminderErrors = document.getElementById("reminderErrors");
 
@@ -552,20 +551,21 @@
 
   reminderForm.addEventListener("submit", function (e) {
     e.preventDefault();
-    var dateVal = reminderDateInput.value;
+    var dateVal = dateSelect.value;
     var textVal = reminderTextInput.value.trim();
 
-    var missing = [];
-    if (!dateVal) missing.push("Date");
-    if (!textVal) missing.push("Description");
-    if (missing.length > 0) {
-      reminderErrors.textContent = "Please fill in: " + missing.join(", ") + ".";
+    if (!dateVal) {
+      reminderErrors.textContent = "Pick a date above first.";
+      return;
+    }
+    if (!textVal) {
+      reminderErrors.textContent = "Please enter a reminder description.";
       return;
     }
     reminderErrors.textContent = "";
 
     PlannerStore.addReminder({ id: makeId(), date: dateVal, text: textVal });
-    reminderForm.reset();
+    reminderTextInput.value = "";
     reminderTextInput.focus();
   });
 
