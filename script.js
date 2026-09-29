@@ -392,37 +392,41 @@
     var table = document.createElement("table");
     table.className = "results-table matrix-table";
 
+    // A single header row (rather than two rows joined by rowSpan) keeps
+    // every <tr> in the table with the same cell count, which avoids a
+    // browser fixed-table-layout quirk where rowSpan'd header cells throw
+    // off column-width calculation and some day columns render wider than
+    // others despite having identical declared widths.
     var thead = document.createElement("thead");
-    var headRow1 = document.createElement("tr");
-    ["Job/Trade", "Task", "Labour"].forEach(function (label) {
+    var LABEL_COLS = [
+      { text: "Job/Trade", cls: "matrix-col-job" },
+      { text: "Task", cls: "matrix-col-task" },
+      { text: "Labour", cls: "matrix-col-labour" }
+    ];
+    var headRow = document.createElement("tr");
+    LABEL_COLS.forEach(function (col) {
       var th = document.createElement("th");
-      th.className = "matrix-label-col";
-      th.rowSpan = 2;
-      th.textContent = label;
-      headRow1.appendChild(th);
+      th.className = "matrix-label-col " + col.cls;
+      th.textContent = col.text;
+      headRow.appendChild(th);
     });
     dates.forEach(function (dateISO, idx) {
       var d = parseISODate(dateISO);
       var th = document.createElement("th");
       th.className = "matrix-day-col" + (idx === 5 ? " week-sep" : "");
-      th.textContent = DAY_LETTERS[d.getDay() === 0 ? 6 : d.getDay() - 1];
-      headRow1.appendChild(th);
+      var letter = document.createElement("div");
+      letter.textContent = DAY_LETTERS[d.getDay() === 0 ? 6 : d.getDay() - 1];
+      var num = document.createElement("div");
+      num.className = "matrix-date-num";
+      num.textContent = String(d.getDate());
+      th.appendChild(letter);
+      th.appendChild(num);
+      headRow.appendChild(th);
     });
     var actionsTh = document.createElement("th");
     actionsTh.className = "no-print matrix-actions-col";
-    actionsTh.rowSpan = 2;
-    headRow1.appendChild(actionsTh);
-    thead.appendChild(headRow1);
-
-    var headRow2 = document.createElement("tr");
-    dates.forEach(function (dateISO, idx) {
-      var d = parseISODate(dateISO);
-      var th = document.createElement("th");
-      th.className = "matrix-day-col matrix-date-num" + (idx === 5 ? " week-sep" : "");
-      th.textContent = String(d.getDate());
-      headRow2.appendChild(th);
-    });
-    thead.appendChild(headRow2);
+    headRow.appendChild(actionsTh);
+    thead.appendChild(headRow);
     table.appendChild(thead);
 
     var tbody = document.createElement("tbody");
@@ -432,10 +436,13 @@
       var tr = document.createElement("tr");
 
       var jobTd = document.createElement("td");
+      jobTd.className = "matrix-col-job";
       jobTd.textContent = entry.job;
       var descTd = document.createElement("td");
+      descTd.className = "matrix-col-task";
       descTd.textContent = entry.task;
       var empTd = document.createElement("td");
+      empTd.className = "matrix-col-labour";
       empTd.textContent = (entry.employers || []).join(", ");
       tr.appendChild(jobTd);
       tr.appendChild(descTd);

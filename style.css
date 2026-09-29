@@ -432,12 +432,9 @@ body.gate-locked { overflow: hidden; }
 
 .matrix-table { table-layout: fixed; }
 .matrix-label-col { vertical-align: top; text-align: left; }
-.matrix-table td.matrix-label-col:nth-child(1),
-.matrix-table th.matrix-label-col:nth-child(1) { width: 110px; }
-.matrix-table td:nth-child(2),
-.matrix-table th:nth-child(2) { width: 170px; }
-.matrix-table td:nth-child(3),
-.matrix-table th:nth-child(3) { width: 110px; }
+.matrix-col-job { width: 110px; }
+.matrix-col-task { width: 170px; }
+.matrix-col-labour { width: 110px; }
 .matrix-day-col {
   width: 34px;
   min-width: 34px;
@@ -451,7 +448,7 @@ body.gate-locked { overflow: hidden; }
   font-weight: normal;
   color: var(--muted);
   font-size: 0.72rem;
-  background: #fff;
+  margin-top: 2px;
 }
 .matrix-actions-col { width: 64px; }
 .matrix-dot {
