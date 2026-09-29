@@ -584,13 +584,15 @@
     exportBtn.textContent = "Preparing PDF…";
     document.body.classList.add("exporting-pdf");
 
+    var orientationInput = document.querySelector('input[name="pdfOrientation"]:checked');
+    var orientation = orientationInput ? orientationInput.value : "landscape";
     var filename = "labour-plan-" + currentFortnightStart + ".pdf";
     var opt = {
       margin: 6,
       filename: filename,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" }
+      jsPDF: { unit: "mm", format: "a4", orientation: orientation }
     };
 
     function finish() {

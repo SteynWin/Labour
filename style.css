@@ -348,6 +348,24 @@ body.gate-locked { overflow: hidden; }
   flex-wrap: wrap;
 }
 
+.pdf-orientation-choice {
+  display: flex;
+  gap: 16px;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+.pdf-orientation-choice label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-weight: normal;
+}
+.pdf-orientation-choice input[type="radio"] {
+  accent-color: var(--brand-tan-dark);
+  cursor: pointer;
+}
+
 .primary-btn {
   background: var(--accent);
   color: #fff;
