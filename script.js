@@ -10,7 +10,7 @@
   var plans = {}; // flat: ISO date -> [entry, ...]
   var reminders = []; // [{ id, date, text }, ...]
   var currentFortnightStart = null; // ISO date string (a Monday)
-  var editingEntry = null; // { id, date, original } of the entry currently loaded into the form, or null
+  var editingGroup = null; // { entries: [{date, entry}, ...] } currently loaded into the form, or null
   var pendingJobSelection = null;
   var pendingEmployerSelections = [];
   var toggledDates = {}; // ISO date -> true, for the Add a Task day-toggle row
@@ -307,14 +307,15 @@
   });
 
   // ---------- Add / Edit entry ----------
-  function enterEditMode(entry, dateISO) {
-    editingEntry = { id: entry.id, date: dateISO, original: entry };
-    jobSelect.value = entry.job;
+  // row: { job, task, employers, dates: [iso, ...], entries: [{date, entry}, ...] }
+  function enterEditMode(row) {
+    editingGroup = { entries: row.entries };
+    jobSelect.value = row.job;
     var boxes = employerCheckList.querySelectorAll('input[type="checkbox"]');
-    boxes.forEach(function (b) { b.checked = (entry.employers || []).indexOf(b.value) !== -1; });
-    taskInput.value = entry.task;
+    boxes.forEach(function (b) { b.checked = row.employers.indexOf(b.value) !== -1; });
+    taskInput.value = row.task;
     toggledDates = {};
-    toggledDates[dateISO] = true;
+    row.dates.forEach(function (d) { toggledDates[d] = true; });
     renderDayToggleRow();
     entryErrors.textContent = "";
 
@@ -327,7 +328,7 @@
   }
 
   function exitEditMode() {
-    editingEntry = null;
+    editingGroup = null;
     inputCardTitle.textContent = "Add a Task";
     entrySubmitBtn.textContent = "+ Add to Plan";
     cancelEditBtn.classList.add("hidden");
@@ -382,8 +383,10 @@
     }
     entryErrors.textContent = "";
 
-    if (editingEntry) {
-      PlannerStore.removeTaskEntry(editingEntry.date, editingEntry.original);
+    if (editingGroup) {
+      editingGroup.entries.forEach(function (pair) {
+        PlannerStore.removeTaskEntry(pair.date, pair.entry);
+      });
       exitEditMode();
     }
 
@@ -423,42 +426,65 @@
       (remindersByDate[r.date] = remindersByDate[r.date] || []).push(r);
     });
 
-    var rows = [];
+    // Group same Job/Trade + Task + Labour entries (however many days they
+    // were added on, whenever) into one row, with a dot for each of its
+    // days - so "deck / Mark, Max" added to 3 days is one line, not 3.
+    var groups = {};
     dates.forEach(function (dateISO) {
-      var tasks = plans[dateISO] || [];
-      if (tasks.length > 0) {
-        tasks.forEach(function (entry) {
-          rows.push({ date: dateISO, entry: entry });
-        });
-      } else if (remindersByDate[dateISO]) {
+      (plans[dateISO] || []).forEach(function (entry) {
+        var empKey = (entry.employers || []).slice().sort().join(",");
+        var key = entry.job + "||" + entry.task + "||" + empKey;
+        if (!groups[key]) {
+          groups[key] = { job: entry.job, task: entry.task, employers: entry.employers || [], dates: [], entries: [] };
+        }
+        groups[key].dates.push(dateISO);
+        groups[key].entries.push({ date: dateISO, entry: entry });
+      });
+    });
+
+    var rows = Object.keys(groups).map(function (key) {
+      var g = groups[key];
+      return { isGroup: true, job: g.job, task: g.task, employers: g.employers, dates: g.dates, entries: g.entries };
+    });
+    dates.forEach(function (dateISO) {
+      var hasTask = (plans[dateISO] || []).length > 0;
+      if (!hasTask && remindersByDate[dateISO]) {
         // A reminder with no task on its date still needs a row to live in.
-        rows.push({ date: dateISO, entry: null });
+        rows.push({ isGroup: false, date: dateISO });
       }
     });
+
+    function earliestDate(row) {
+      return row.isGroup ? row.dates.slice().sort()[0] : row.date;
+    }
 
     // Sort by Job/Trade (case-insensitive); rows with no job (a reminder
     // with no task on its date) sort to the end, chronologically among
-    // themselves. Same-job rows stay in date order.
+    // themselves. Same-job rows stay in date order (earliest day first).
     rows.sort(function (a, b) {
-      var jobA = a.entry ? a.entry.job.trim().toLowerCase() : null;
-      var jobB = b.entry ? b.entry.job.trim().toLowerCase() : null;
-      if (jobA === null && jobB === null) return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+      var jobA = a.isGroup ? a.job.trim().toLowerCase() : null;
+      var jobB = b.isGroup ? b.job.trim().toLowerCase() : null;
+      if (jobA === null && jobB === null) return earliestDate(a) < earliestDate(b) ? -1 : earliestDate(a) > earliestDate(b) ? 1 : 0;
       if (jobA === null) return 1;
       if (jobB === null) return -1;
       if (jobA !== jobB) return jobA < jobB ? -1 : 1;
-      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+      return earliestDate(a) < earliestDate(b) ? -1 : earliestDate(a) > earliestDate(b) ? 1 : 0;
     });
 
     // Attach each date's reminder(s) to the first row (in the now-sorted
-    // order) for that date, so they show once rather than on every row.
+    // order) that covers that date, so they show once rather than on every
+    // row that happens to share the date.
     var usedReminderDates = {};
     rows.forEach(function (row) {
-      if (remindersByDate[row.date] && !usedReminderDates[row.date]) {
-        row.reminders = remindersByDate[row.date];
-        usedReminderDates[row.date] = true;
-      } else {
-        row.reminders = [];
-      }
+      var rowDates = row.isGroup ? row.dates : [row.date];
+      var attached = [];
+      rowDates.forEach(function (d) {
+        if (remindersByDate[d] && !usedReminderDates[d]) {
+          attached = attached.concat(remindersByDate[d]);
+          usedReminderDates[d] = true;
+        }
+      });
+      row.reminders = attached;
     });
 
     if (rows.length === 0) {
@@ -517,8 +543,7 @@
 
     var tbody = document.createElement("tbody");
     rows.forEach(function (row) {
-      var entry = row.entry;
-      var dateISO = row.date;
+      var rowDates = row.isGroup ? row.dates : [row.date];
       var tr = document.createElement("tr");
 
       var jobTd = document.createElement("td");
@@ -527,10 +552,10 @@
       descTd.className = "matrix-col-task";
       var empTd = document.createElement("td");
       empTd.className = "matrix-col-labour";
-      if (entry) {
-        jobTd.textContent = entry.job;
-        descTd.textContent = entry.task;
-        empTd.textContent = (entry.employers || []).join(", ");
+      if (row.isGroup) {
+        jobTd.textContent = row.job;
+        descTd.textContent = row.task;
+        empTd.textContent = row.employers.join(", ");
       }
       tr.appendChild(jobTd);
       tr.appendChild(descTd);
@@ -539,7 +564,7 @@
       dates.forEach(function (d, idx) {
         var td = document.createElement("td");
         td.className = "matrix-day-col" + (idx === 5 ? " week-sep" : "");
-        if (d === dateISO) {
+        if (rowDates.indexOf(d) !== -1) {
           var dot = document.createElement("span");
           dot.className = "matrix-dot";
           td.appendChild(dot);
@@ -573,9 +598,10 @@
 
       var actionTd = document.createElement("td");
       actionTd.className = "no-print matrix-actions-col";
-      if (entry) {
+      if (row.isGroup) {
         var actionsWrap = document.createElement("div");
         actionsWrap.className = "row-actions";
+        var entryIds = row.entries.map(function (pair) { return pair.entry.id; });
 
         var editBtn = document.createElement("button");
         editBtn.type = "button";
@@ -583,7 +609,7 @@
         editBtn.setAttribute("aria-label", "Edit this task");
         editBtn.textContent = "✎";
         editBtn.addEventListener("click", function () {
-          enterEditMode(entry, dateISO);
+          enterEditMode(row);
         });
 
         var delBtn = document.createElement("button");
@@ -592,8 +618,11 @@
         delBtn.setAttribute("aria-label", "Remove this task");
         delBtn.textContent = "×";
         delBtn.addEventListener("click", function () {
-          PlannerStore.removeTaskEntry(dateISO, entry);
-          if (editingEntry && editingEntry.id === entry.id) {
+          if (entryIds.length > 1 && !window.confirm("Remove this task from all " + entryIds.length + " days?")) return;
+          row.entries.forEach(function (pair) {
+            PlannerStore.removeTaskEntry(pair.date, pair.entry);
+          });
+          if (editingGroup && editingGroup.entries.some(function (pair) { return entryIds.indexOf(pair.entry.id) !== -1; })) {
             exitEditMode();
             resetEntryFormAfterSave();
           }
