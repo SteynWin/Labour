@@ -8,7 +8,7 @@
      time style.css/access-gate.js/store.js/script.js change, so browsers
      that already cached the old files are forced to fetch the new ones
      instead of silently keeping stale copies. -->
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -59,18 +59,16 @@
     </div>
   </section>
 
-  <!-- INPUT: add one task at a time -->
+  <!-- INPUT: laid out like a row of the report below - Job/Trade, Task,
+       Labour, then the same day columns (tap a day to toggle it on/off),
+       then Reminder. Tap "+ Add to Plan" once to add the task (and/or
+       reminder) to every day you've toggled on. -->
   <section class="card no-print" id="inputCard">
     <h2 class="card-title" id="inputCardTitle">Add a Task</h2>
     <form id="entryForm">
       <div class="input-row">
 
-        <div class="field-box">
-          <label for="dateSelect">Date</label>
-          <select id="dateSelect"></select>
-        </div>
-
-        <div class="field-box">
+        <div class="field-box field-box-compact">
           <label for="jobSelect">Job/Trade</label>
           <select id="jobSelect"></select>
           <div class="field-box-actions">
@@ -79,7 +77,12 @@
           </div>
         </div>
 
-        <div class="field-box">
+        <div class="field-box field-box-task">
+          <label for="taskInput">Task</label>
+          <input type="text" id="taskInput" placeholder="What needs to be done?">
+        </div>
+
+        <div class="field-box field-box-compact">
           <label>Labour</label>
           <div class="checkbox-list" id="employerCheckList"></div>
           <div class="field-box-actions">
@@ -87,9 +90,14 @@
           </div>
         </div>
 
-        <div class="field-box field-box-task">
-          <label for="taskInput">Task</label>
-          <textarea id="taskInput" rows="2" placeholder="What needs to be done?"></textarea>
+        <div class="field-box field-box-days">
+          <label>Days (tap to toggle on/off)</label>
+          <div id="dayToggleRow" class="day-toggle-row"></div>
+        </div>
+
+        <div class="field-box field-box-reminder">
+          <label for="reminderTextInput">Reminder</label>
+          <input type="text" id="reminderTextInput" placeholder="e.g. Order more tiles">
         </div>
 
       </div>
@@ -100,16 +108,6 @@
         <button type="submit" id="entrySubmitBtn" class="primary-btn">+ Add to Plan</button>
       </div>
     </form>
-
-    <!-- Reminder: uses the Date field above, independent of the task entry -->
-    <div class="field-box field-box-reminder">
-      <label for="reminderTextInput">Reminder (optional, uses the Date above)</label>
-      <form id="reminderForm" class="reminder-inline-form">
-        <input type="text" id="reminderTextInput" placeholder="e.g. Order more tiles">
-        <button type="submit" id="reminderAddBtn">+ Add Reminder</button>
-      </form>
-      <div id="reminderErrors" class="form-errors" role="alert"></div>
-    </div>
   </section>
 
   <!-- RESULTS: matrix, one row per task, dots mark its day -->
@@ -159,6 +157,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.14.0/html2pdf.bundle.min.js"></script>
 <script src="firebase-config.js"></script>
 <script src="store.js?v=1"></script>
-<script src="script.js?v=2"></script>
+<script src="script.js?v=3"></script>
 </body>
 </html>

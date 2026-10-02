@@ -13,6 +13,7 @@
   var editingEntry = null; // { id, date, original } of the entry currently loaded into the form, or null
   var pendingJobSelection = null;
   var pendingEmployerSelections = [];
+  var toggledDates = {}; // ISO date -> true, for the Add a Task day-toggle row
 
   function makeId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -54,14 +55,6 @@
     });
   }
 
-  function formatShortDate(date) {
-    return date.toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric"
-    });
-  }
-
   function fortnightDates() {
     var monday = parseISODate(currentFortnightStart);
     var out = [];
@@ -89,10 +82,11 @@
   var inputCard = document.getElementById("inputCard");
   var inputCardTitle = document.getElementById("inputCardTitle");
   var entryForm = document.getElementById("entryForm");
-  var dateSelect = document.getElementById("dateSelect");
+  var dayToggleRow = document.getElementById("dayToggleRow");
   var jobSelect = document.getElementById("jobSelect");
   var employerCheckList = document.getElementById("employerCheckList");
   var taskInput = document.getElementById("taskInput");
+  var reminderTextInput = document.getElementById("reminderTextInput");
   var entryErrors = document.getElementById("entryErrors");
   var entrySubmitBtn = document.getElementById("entrySubmitBtn");
   var cancelEditBtn = document.getElementById("cancelEditBtn");
@@ -105,10 +99,6 @@
   var resultsWeekRange = document.getElementById("resultsWeekRange");
   var printArea = document.getElementById("printArea");
   var exportBtn = document.getElementById("exportBtn");
-
-  var reminderForm = document.getElementById("reminderForm");
-  var reminderTextInput = document.getElementById("reminderTextInput");
-  var reminderErrors = document.getElementById("reminderErrors");
 
   var backupText = document.querySelector(".backup-text p");
   var backupDownloadBtn = document.getElementById("backupDownloadBtn");
@@ -167,24 +157,45 @@
     }
     currentFortnightStart = iso;
     updateFortnightRangeLabel();
-    populateDateSelect();
+    toggledDates = {};
+    renderDayToggleRow();
     exitEditMode();
     renderResults();
   });
 
-  // ---------- Date dropdown (10 weekdays of the selected fortnight) ----------
-  function populateDateSelect() {
-    var prevValue = dateSelect.value;
-    dateSelect.innerHTML = "";
-    workingDates().forEach(function (iso) {
-      var opt = document.createElement("option");
-      opt.value = iso;
-      opt.textContent = formatShortDate(parseISODate(iso));
-      dateSelect.appendChild(opt);
+  // ---------- Day-toggle row (10 weekdays of the selected fortnight; tap
+  // a day to turn its dot on/off for the task/reminder about to be added) ----------
+  function renderDayToggleRow() {
+    dayToggleRow.innerHTML = "";
+    workingDates().forEach(function (dateISO, idx) {
+      var d = parseISODate(dateISO);
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "day-toggle" + (idx === 5 ? " week-sep" : "");
+      if (toggledDates[dateISO]) btn.classList.add("active");
+
+      var letter = document.createElement("span");
+      letter.className = "day-toggle-letter";
+      letter.textContent = DAY_LETTERS[d.getDay() === 0 ? 6 : d.getDay() - 1];
+
+      var num = document.createElement("span");
+      num.className = "day-toggle-num";
+      num.textContent = String(d.getDate());
+
+      var dot = document.createElement("span");
+      dot.className = "day-toggle-dot";
+
+      btn.appendChild(letter);
+      btn.appendChild(num);
+      btn.appendChild(dot);
+
+      btn.addEventListener("click", function () {
+        toggledDates[dateISO] = !toggledDates[dateISO];
+        btn.classList.toggle("active", !!toggledDates[dateISO]);
+      });
+
+      dayToggleRow.appendChild(btn);
     });
-    if (workingDates().indexOf(prevValue) !== -1) {
-      dateSelect.value = prevValue;
-    }
   }
 
   // ---------- Options builders ----------
@@ -298,11 +309,13 @@
   // ---------- Add / Edit entry ----------
   function enterEditMode(entry, dateISO) {
     editingEntry = { id: entry.id, date: dateISO, original: entry };
-    dateSelect.value = dateISO;
     jobSelect.value = entry.job;
     var boxes = employerCheckList.querySelectorAll('input[type="checkbox"]');
     boxes.forEach(function (b) { b.checked = (entry.employers || []).indexOf(b.value) !== -1; });
     taskInput.value = entry.task;
+    toggledDates = {};
+    toggledDates[dateISO] = true;
+    renderDayToggleRow();
     entryErrors.textContent = "";
 
     inputCardTitle.textContent = "Edit Task";
@@ -323,8 +336,11 @@
 
   function resetEntryFormAfterSave() {
     taskInput.value = "";
+    reminderTextInput.value = "";
     var checkedBoxes = employerCheckList.querySelectorAll('input[type="checkbox"]:checked');
     checkedBoxes.forEach(function (b) { b.checked = false; });
+    toggledDates = {};
+    renderDayToggleRow();
   }
 
   cancelEditBtn.addEventListener("click", function () {
@@ -335,15 +351,30 @@
 
   entryForm.addEventListener("submit", function (e) {
     e.preventDefault();
-    var dateISO = dateSelect.value;
     var job = jobSelect.value;
     var selectedEmployers = getCheckedEmployers();
     var task = taskInput.value.trim();
+    var reminderText = reminderTextInput.value.trim();
+    var activeDates = workingDates().filter(function (d) { return toggledDates[d]; });
+
+    // Job/Trade keeps its selected value after a submit (so adding several
+    // tasks for the same job in a row is easy), so it alone isn't a signal
+    // of fresh intent - only new Task text or a newly-checked Labour name
+    // means "this submit is adding a task", not just a reminder.
+    var wantsTask = task.length > 0 || selectedEmployers.length > 0;
+    var wantsReminder = reminderText.length > 0;
 
     var missing = [];
-    if (!job) missing.push("Job/Trade");
-    if (!task) missing.push("Task");
-    if (selectedEmployers.length === 0) missing.push("Labour");
+    if (wantsTask) {
+      if (!job) missing.push("Job/Trade");
+      if (!task) missing.push("Task");
+      if (selectedEmployers.length === 0) missing.push("Labour");
+    }
+    if (!wantsTask && !wantsReminder) {
+      missing.push("a Task or a Reminder");
+    } else if (activeDates.length === 0) {
+      missing.push("at least one day toggled on");
+    }
 
     if (missing.length > 0) {
       entryErrors.textContent = "Please fill in: " + missing.join(", ") + ".";
@@ -353,19 +384,23 @@
 
     if (editingEntry) {
       PlannerStore.removeTaskEntry(editingEntry.date, editingEntry.original);
-      PlannerStore.addTaskEntry(dateISO, {
-        id: editingEntry.id,
-        job: job,
-        employers: selectedEmployers,
-        task: task
-      });
       exitEditMode();
-    } else {
-      PlannerStore.addTaskEntry(dateISO, {
-        id: makeId(),
-        job: job,
-        employers: selectedEmployers,
-        task: task
+    }
+
+    if (wantsTask) {
+      activeDates.forEach(function (dateISO) {
+        PlannerStore.addTaskEntry(dateISO, {
+          id: makeId(),
+          job: job,
+          employers: selectedEmployers,
+          task: task
+        });
+      });
+    }
+
+    if (wantsReminder) {
+      activeDates.forEach(function (dateISO) {
+        PlannerStore.addReminder({ id: makeId(), date: dateISO, text: reminderText });
       });
     }
 
@@ -379,9 +414,9 @@
     var dates = workingDates();
     resultsBody.innerHTML = "";
 
-    // Reminders only ever get a date from this same dateSelect, so every
-    // reminder's date always belongs to SOME fortnight's working days -
-    // just not necessarily the one currently being viewed.
+    // Reminders only ever get a date from the Add a Task day-toggle row, so
+    // every reminder's date always belongs to SOME fortnight's working days
+    // - just not necessarily the one currently being viewed.
     var remindersByDate = {};
     reminders.forEach(function (r) {
       if (dates.indexOf(r.date) === -1) return;
@@ -578,28 +613,6 @@
     resultsWeekRange.textContent = weekRangeLabel.textContent;
   }
 
-  // ---------- Add a reminder (uses the Date field above; shown inline in
-  // the matrix's Reminder column, in the row for that date) ----------
-  reminderForm.addEventListener("submit", function (e) {
-    e.preventDefault();
-    var dateVal = dateSelect.value;
-    var textVal = reminderTextInput.value.trim();
-
-    if (!dateVal) {
-      reminderErrors.textContent = "Pick a date above first.";
-      return;
-    }
-    if (!textVal) {
-      reminderErrors.textContent = "Please enter a reminder description.";
-      return;
-    }
-    reminderErrors.textContent = "";
-
-    PlannerStore.addReminder({ id: makeId(), date: dateVal, text: textVal });
-    reminderTextInput.value = "";
-    reminderTextInput.focus();
-  });
-
   // ---------- Export as PDF ----------
   // Generates and downloads an actual PDF file by rendering the page
   // directly, rather than using the browser's print dialog - this works
@@ -715,7 +728,7 @@
 
   // ---------- Init ----------
   initFortnight();
-  populateDateSelect();
+  renderDayToggleRow();
   renderResults();
 
   PlannerStore.init({

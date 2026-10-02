@@ -215,15 +215,21 @@ body.gate-locked { overflow: hidden; }
 .backup-actions .danger-btn:hover { background: var(--danger-bg); }
 #backupMsg { margin-top: 8px; }
 
-/* Add-a-task input form */
+/* Add-a-task input form: Job/Trade, Task, Labour, day-toggle row, Reminder -
+   laid out left-to-right the same way the report's columns read. */
 .input-row {
   display: grid;
-  grid-template-columns: 1fr 1.4fr 1.4fr 2fr;
+  grid-template-columns: 1fr 1.5fr 1fr 3.2fr 1.6fr;
   gap: 14px;
   align-items: start;
 }
+@media (max-width: 1080px) {
+  .input-row { grid-template-columns: 1fr 1.5fr 1fr; }
+  .field-box-days, .field-box-reminder { grid-column: 1 / -1; }
+}
 @media (max-width: 780px) {
   .input-row { grid-template-columns: 1fr; }
+  .field-box-days, .field-box-reminder { grid-column: auto; }
 }
 
 .field-box {
@@ -243,7 +249,8 @@ body.gate-locked { overflow: hidden; }
 }
 
 .field-box select,
-.field-box textarea {
+.field-box textarea,
+.field-box input[type="text"] {
   width: 100%;
   padding: 8px 9px;
   border: 1px solid var(--border);
@@ -485,35 +492,55 @@ body.gate-locked { overflow: hidden; }
   margin-top: 4px;
 }
 
-.field-box-reminder {
-  margin-top: 14px;
-}
-.reminder-inline-form {
+/* Day-toggle row inside Add a Task: tap a day to turn its dot on/off for
+   the task/reminder about to be added - mirrors the report's day columns
+   (letter + date number + dot) but as clickable buttons. */
+.day-toggle-row {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px;
 }
-.reminder-inline-form input[type="text"] {
-  flex: 1;
-  min-width: 0;
-  padding: 8px 9px;
+.day-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 34px;
+  height: 46px;
+  padding: 4px 2px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 0.9rem;
-  font-family: inherit;
   background: #fff;
-}
-.reminder-inline-form button {
-  flex-shrink: 0;
-  padding: 8px 14px;
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 6px;
-  font-size: 0.85rem;
   cursor: pointer;
-  color: var(--text);
-  white-space: nowrap;
+  font-family: inherit;
 }
-.reminder-inline-form button:hover { background: #efece6; }
+.day-toggle:hover { background: #efece6; }
+.day-toggle.week-sep { margin-left: 6px; }
+.day-toggle-letter {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.day-toggle-num {
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+.day-toggle-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+}
+.day-toggle.active {
+  background: #fdf3e4;
+  border-color: var(--brand-tan-dark);
+}
+.day-toggle.active .day-toggle-dot {
+  background: var(--brand-tan-dark);
+  border-color: var(--brand-tan-dark);
+}
 
 .row-actions {
   display: flex;
